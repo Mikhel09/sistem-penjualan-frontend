@@ -3,6 +3,8 @@ import Login from './Login';
 import TambahProduk from './TambahProduk';
 import Kasir from './Kasir';
 import { API_URL } from './api';
+import KelolaStaff from './KelolaStaff';
+
 
 function App() {
   const [token, setToken] = useState(null);
@@ -36,10 +38,15 @@ function App() {
       <h1>{user?.nama_bisnis} — {user?.nama}</h1>
 
       <nav style={{ marginBottom: '1rem' }}>
-        <button onClick={() => setHalaman('produk')}>Daftar Produk</button>{' '}
-        <button onClick={() => setHalaman('tambah')}>Tambah Produk</button>{' '}
-        <button onClick={() => setHalaman('kasir')}>Kasir</button>
-      </nav>
+  <button onClick={() => setHalaman('produk')}>Daftar Produk</button>{' '}
+  {(user?.role === 'owner' || user?.role === 'admin') && (
+    <button onClick={() => setHalaman('tambah')}>Tambah Produk</button>
+  )}{' '}
+  <button onClick={() => setHalaman('kasir')}>Kasir</button>{' '}
+  {user?.role === 'owner' && (
+    <button onClick={() => setHalaman('staff')}>Kelola Staff</button>
+  )}
+  </nav>
 
       {halaman === 'produk' && (
         <table border="1" cellPadding="8" style={{ borderCollapse: 'collapse' }}>
@@ -64,6 +71,9 @@ function App() {
       )}
 
       {halaman === 'kasir' && <Kasir token={token} jenisUsaha={user?.jenis_usaha} />}
+      {halaman === 'staff' && <KelolaStaff token={token} />}
+
+
     </div>
   );
 }
