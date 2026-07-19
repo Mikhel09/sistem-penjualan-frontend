@@ -4,6 +4,7 @@ import TambahProduk from './TambahProduk';
 import Kasir from './Kasir';
 import KelolaStaff from './KelolaStaff';
 import RiwayatTransaksi from './RiwayatTransaksi';
+import Laporan from './Laporan';
 import { API_URL } from './api';
 
 function App() {
@@ -62,6 +63,9 @@ function App() {
         )}{' '}
         <button onClick={() => setHalaman('kasir')}>Kasir</button>{' '}
         <button onClick={() => setHalaman('riwayat')}>Riwayat Transaksi</button>{' '}
+        {(user?.role === 'owner' || user?.role === 'admin') && (
+          <button onClick={() => setHalaman('laporan')}>Laporan</button>
+        )}{' '}
         {user?.role === 'owner' && (
           <button onClick={() => setHalaman('staff')}>Kelola Staff</button>
         )}
@@ -107,6 +111,8 @@ function App() {
       {halaman === 'kasir' && <Kasir token={token} jenisUsaha={user?.jenis_usaha} namaBisnis={user?.nama_bisnis} />}
 
       {halaman === 'riwayat' && <RiwayatTransaksi token={token} />}
+
+      {halaman === 'laporan' && <Laporan token={token} />}
 
       {halaman === 'staff' && <KelolaStaff token={token} />}
     </div>
