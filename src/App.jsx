@@ -51,9 +51,22 @@ function App() {
     }
   };
 
+  const [produkMenipis, setProdukMenipis] = useState([]);
+
+  const muatProdukMenipis = () => {
+  fetch(`${API_URL}/api/products/stok-menipis/list`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+    .then((res) => res.json())
+    .then(setProdukMenipis);
+};
+
   useEffect(() => {
-    if (token) muatProduk();
-  }, [token]);
+  if (token) {
+    muatProduk();
+    muatProdukMenipis();
+  }
+}, [token]);
 
   if (resetToken) {
     return <ResetPassword token={resetToken} />;
@@ -69,6 +82,16 @@ function App() {
   return (
     <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
       <h1>{user?.nama_bisnis} — {user?.nama} {user?.nama_toko ? `(${user.nama_toko})` : '(Semua Cabang)'}</h1>
+      {produkMenipis.length > 0 && (
+  <div style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '8px', padding: '1rem', marginBottom: '1rem' }}>
+    <strong>⚠️ Stok Menipis:</strong>
+    <ul style={{ margin: '8px 0 0 0' }}>
+      {produkMenipis.map((p) => (
+        <li key={p.id}>{p.nama} — sisa {p.stok} (batas: {p.stok_minimum}){p.nama_toko ? ` — ${p.nama_toko}` : ''}</li>
+      ))}
+    </ul>
+  </div>
+)}
 
       <nav style={{ marginBottom: '1rem' }}>
         <button onClick={() => setHalaman('produk')}>Daftar Produk</button>{' '}
@@ -121,11 +144,17 @@ function App() {
           token={token}
           jenisUsaha={user?.jenis_usaha}
           storeIdUser={user?.store_id}
-          onProdukDitambahkan={muatProduk}
+          onProdukDitambahkan={() => { 
+            muatProduk(); 
+            muatProdukMenipis(); 
+          }}
           produkDiedit={produkDiedit}
-          onSelesaiEdit={() => { setProdukDiedit(null); setHalaman('produk'); }}
-        />
-      )}
+          onSelesaiEdit={() => { 
+            setProdukDiedit(null); 
+            setHalaman('produk'); 
+    }}
+  />
+)}
 
       {halaman === 'kasir' && (
         <Kasir token={token} jenisUsaha={user?.jenis_usaha} namaBisnis={user?.nama_bisnis} storeIdUser={user?.store_id} />

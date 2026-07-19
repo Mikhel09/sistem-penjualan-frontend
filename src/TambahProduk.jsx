@@ -20,6 +20,7 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
   const [nama, setNama] = useState('');
   const [harga, setHarga] = useState('');
   const [stok, setStok] = useState('');
+  const [stokMinimum, setStokMinimum] = useState('5');
   const [attrValues, setAttrValues] = useState({});
   const [cabangList, setCabangList] = useState([]);
   const [storeIdDipilih, setStoreIdDipilih] = useState('');
@@ -27,7 +28,7 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
 
   const fieldsKategori = FIELD_PER_KATEGORI[jenisUsaha] || [];
   const isEdit = Boolean(produkDiedit);
-  const butuhPilihCabang = !storeIdUser; // owner tidak punya store_id sendiri
+  const butuhPilihCabang = !storeIdUser;
 
   useEffect(() => {
     if (butuhPilihCabang) {
@@ -42,11 +43,13 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
       setNama(produkDiedit.nama);
       setHarga(produkDiedit.harga);
       setStok(produkDiedit.stok);
+      setStokMinimum(produkDiedit.stok_minimum ?? 5);
       setAttrValues(produkDiedit.attributes || {});
     } else {
       setNama('');
       setHarga('');
       setStok('');
+      setStokMinimum('5');
       setAttrValues({});
     }
   }, [produkDiedit]);
@@ -70,14 +73,12 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
     try {
       const res = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           nama,
           harga: Number(harga),
           stok: Number(stok),
+          stok_minimum: Number(stokMinimum),
           attributes: attrValues,
           store_id: storeIdUser || Number(storeIdDipilih),
         }),
@@ -91,6 +92,7 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
       setNama('');
       setHarga('');
       setStok('');
+      setStokMinimum('5');
       setAttrValues({});
       if (onProdukDitambahkan) onProdukDitambahkan();
       if (isEdit && onSelesaiEdit) onSelesaiEdit();
@@ -106,11 +108,7 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
         {butuhPilihCabang && !isEdit && (
           <div style={{ marginBottom: '0.75rem' }}>
             <label>Cabang</label>
-            <select
-              value={storeIdDipilih}
-              onChange={(e) => setStoreIdDipilih(e.target.value)}
-              style={{ width: '100%', padding: '6px' }}
-            >
+            <select value={storeIdDipilih} onChange={(e) => setStoreIdDipilih(e.target.value)} style={{ width: '100%', padding: '6px' }}>
               <option value="">-- Pilih Cabang --</option>
               {cabangList.map((c) => (
                 <option key={c.id} value={c.id}>{c.nama_toko}</option>
@@ -130,6 +128,10 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
         <div style={{ marginBottom: '0.75rem' }}>
           <label>Stok</label>
           <input type="number" value={stok} onChange={(e) => setStok(e.target.value)} required style={{ width: '100%', padding: '6px' }} />
+        </div>
+        <div style={{ marginBottom: '0.75rem' }}>
+          <label>Stok Minimum (batas peringatan)</label>
+          <input type="number" value={stokMinimum} onChange={(e) => setStokMinimum(e.target.value)} style={{ width: '100%', padding: '6px' }} />
         </div>
 
         {fieldsKategori.map((field) => (
