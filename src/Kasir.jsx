@@ -1,22 +1,35 @@
 import { useState, useEffect } from 'react';
 import { API_URL } from './api';
 
-function Kasir({ token, jenisUsaha, namaBisnis }) {
+function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
+  const [cabangList, setCabangList] = useState([]);
+  const [storeIdDipilih, setStoreIdDipilih] = useState('');
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
   const [message, setMessage] = useState('');
   const [noMeja, setNoMeja] = useState('');
   const [catatan, setCatatan] = useState('');
   const [kodeBarcode, setKodeBarcode] = useState('');
-  const [strukData, setStrukData] = useState(null); // data transaksi yang sudah selesai, siap dicetak
+  const [strukData, setStrukData] = useState(null);
+
+  const butuhPilihCabang = !storeIdUser;
+  const storeIdAktif = storeIdUser || storeIdDipilih;
 
   useEffect(() => {
-    fetch(`${API_URL}/api/products`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    if (butuhPilihCabang) {
+      fetch(`${API_URL}/api/stores`, { headers: { Authorization: `Bearer ${token}` } })
+        .then((res) => res.json())
+        .then(setCabangList);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!storeIdAktif) return;
+    const url = storeIdUser ? `${API_URL}/api/products` : `${API_URL}/api/products?store_id=${storeIdAktif}`;
+    fetch(url, { headers: { Authorization: `Bearer ${token}` } })
       .then((res) => res.json())
       .then(setProducts);
-  }, [token]);
+  }, [storeIdAktif]);
 
   const tambahKeKeranjang = (produk) => {
     setCart((prev) => {
@@ -49,14 +62,12 @@ function Kasir({ token, jenisUsaha, namaBisnis }) {
     try {
       const res = await fetch(`${API_URL}/api/transactions`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           items: cart.map((item) => ({ product_id: item.product_id, qty: item.qty })),
           no_meja: jenisUsaha === 'makanan_minuman' ? noMeja : undefined,
           catatan: jenisUsaha === 'makanan_minuman' ? catatan : undefined,
+          store_id: Number(storeIdAktif),
         }),
       });
       const data = await res.json();
@@ -65,7 +76,6 @@ function Kasir({ token, jenisUsaha, namaBisnis }) {
         return;
       }
 
-      // Ambil detail lengkap transaksi (nama produk, dll) untuk ditampilkan di struk
       const detailRes = await fetch(`${API_URL}/api/transactions/${data.transaction_id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -75,9 +85,6 @@ function Kasir({ token, jenisUsaha, namaBisnis }) {
       setCart([]);
       setNoMeja('');
       setCatatan('');
-      fetch(`${API_URL}/api/products`, { headers: { Authorization: `Bearer ${token}` } })
-        .then((res) => res.json())
-        .then(setProducts); // refresh stok setelah transaksi
     } catch (err) {
       setMessage('Tidak bisa terhubung ke server');
     }
@@ -88,14 +95,24 @@ function Kasir({ token, jenisUsaha, namaBisnis }) {
     setMessage('');
   };
 
-  // TAMPILAN STRUK (muncul setelah bayar berhasil)
+  if (butuhPilihCabang && !storeIdDipilih) {
+    return (
+      <div>
+        <h3>Pilih Cabang untuk Mulai Transaksi</h3>
+        <select value={storeIdDipilih} onChange={(e) => setStoreIdDipilih(e.target.value)} style={{ padding: '8px' }}>
+          <option value="">-- Pilih Cabang --</option>
+          {cabangList.map((c) => (
+            <option key={c.id} value={c.id}>{c.nama_toko}</option>
+          ))}
+        </select>
+      </div>
+    );
+  }
+
   if (strukData) {
     return (
       <div>
-        <div
-          className="area-cetak"
-          style={{ maxWidth: '300px', fontFamily: 'monospace', border: '1px dashed #333', padding: '1rem' }}
-        >
+        <div className="area-cetak" style={{ maxWidth: '300px', fontFamily: 'monospace', border: '1px dashed #333', padding: '1rem' }}>
           <h3 style={{ textAlign: 'center', margin: '0 0 4px 0' }}>{namaBisnis}</h3>
           <p style={{ textAlign: 'center', margin: '0 0 8px 0' }}>
             {new Date(strukData.transaksi.created_at).toLocaleString('id-ID')}
@@ -116,7 +133,6 @@ function Kasir({ token, jenisUsaha, namaBisnis }) {
           {strukData.transaksi.catatan && <p>Catatan: {strukData.transaksi.catatan}</p>}
           <p style={{ textAlign: 'center', marginTop: '1rem' }}>Terima kasih!</p>
         </div>
-
         <div className="no-print" style={{ marginTop: '1rem' }}>
           <button onClick={() => window.print()}>Cetak Struk</button>{' '}
           <button onClick={transaksiBaru}>Transaksi Baru</button>
@@ -125,7 +141,6 @@ function Kasir({ token, jenisUsaha, namaBisnis }) {
     );
   }
 
-  // TAMPILAN KASIR NORMAL (sebelum bayar)
   return (
     <div style={{ display: 'flex', gap: '2rem', padding: '1rem' }}>
       <div>

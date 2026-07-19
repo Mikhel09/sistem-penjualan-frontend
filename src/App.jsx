@@ -5,6 +5,7 @@ import ResetPassword from './ResetPassword';
 import TambahProduk from './TambahProduk';
 import Kasir from './Kasir';
 import KelolaStaff from './KelolaStaff';
+import KelolaCabang from './KelolaCabang';
 import RiwayatTransaksi from './RiwayatTransaksi';
 import Laporan from './Laporan';
 import { API_URL } from './api';
@@ -15,9 +16,8 @@ function App() {
   const [products, setProducts] = useState([]);
   const [halaman, setHalaman] = useState('produk');
   const [produkDiedit, setProdukDiedit] = useState(null);
-  const [tampilanAuth, setTampilanAuth] = useState('login'); // 'login' | 'lupa-password'
+  const [tampilanAuth, setTampilanAuth] = useState('login');
 
-  // Cek apakah URL saat ini mengandung ?token=... (artinya user klik link dari email)
   const urlParams = new URLSearchParams(window.location.search);
   const resetToken = urlParams.get('token');
 
@@ -55,12 +55,10 @@ function App() {
     if (token) muatProduk();
   }, [token]);
 
-  // Prioritas 1: kalau ada token reset password di URL, tampilkan halaman itu dulu
   if (resetToken) {
     return <ResetPassword token={resetToken} />;
   }
 
-  // Prioritas 2: belum login
   if (!token) {
     if (tampilanAuth === 'lupa-password') {
       return <LupaPassword onKembali={() => setTampilanAuth('login')} />;
@@ -68,10 +66,9 @@ function App() {
     return <Login onLoginSuccess={handleLoginSuccess} onLupaPassword={() => setTampilanAuth('lupa-password')} />;
   }
 
-  // Prioritas 3: sudah login, tampilan utama aplikasi
   return (
     <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
-      <h1>{user?.nama_bisnis} — {user?.nama}</h1>
+      <h1>{user?.nama_bisnis} — {user?.nama} {user?.nama_toko ? `(${user.nama_toko})` : '(Semua Cabang)'}</h1>
 
       <nav style={{ marginBottom: '1rem' }}>
         <button onClick={() => setHalaman('produk')}>Daftar Produk</button>{' '}
@@ -84,7 +81,10 @@ function App() {
           <button onClick={() => setHalaman('laporan')}>Laporan</button>
         )}{' '}
         {user?.role === 'owner' && (
-          <button onClick={() => setHalaman('staff')}>Kelola Staff</button>
+          <>
+            <button onClick={() => setHalaman('staff')}>Kelola Staff</button>{' '}
+            <button onClick={() => setHalaman('cabang')}>Kelola Cabang</button>
+          </>
         )}
       </nav>
 
@@ -92,7 +92,7 @@ function App() {
         <table border="1" cellPadding="8" style={{ borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              <th>Nama</th><th>Harga</th><th>Stok</th><th>Detail</th>
+              <th>Nama</th><th>Harga</th><th>Stok</th><th>Cabang</th><th>Detail</th>
               {(user?.role === 'owner' || user?.role === 'admin') && <th>Aksi</th>}
             </tr>
           </thead>
@@ -102,6 +102,7 @@ function App() {
                 <td>{p.nama}</td>
                 <td>Rp {Number(p.harga).toLocaleString('id-ID')}</td>
                 <td>{p.stok}</td>
+                <td>{p.nama_toko}</td>
                 <td>{JSON.stringify(p.attributes)}</td>
                 {(user?.role === 'owner' || user?.role === 'admin') && (
                   <td>
@@ -119,19 +120,24 @@ function App() {
         <TambahProduk
           token={token}
           jenisUsaha={user?.jenis_usaha}
+          storeIdUser={user?.store_id}
           onProdukDitambahkan={muatProduk}
           produkDiedit={produkDiedit}
           onSelesaiEdit={() => { setProdukDiedit(null); setHalaman('produk'); }}
         />
       )}
 
-      {halaman === 'kasir' && <Kasir token={token} jenisUsaha={user?.jenis_usaha} namaBisnis={user?.nama_bisnis} />}
+      {halaman === 'kasir' && (
+        <Kasir token={token} jenisUsaha={user?.jenis_usaha} namaBisnis={user?.nama_bisnis} storeIdUser={user?.store_id} />
+      )}
 
       {halaman === 'riwayat' && <RiwayatTransaksi token={token} />}
 
       {halaman === 'laporan' && <Laporan token={token} />}
 
       {halaman === 'staff' && <KelolaStaff token={token} />}
+
+      {halaman === 'cabang' && <KelolaCabang token={token} />}
     </div>
   );
 }

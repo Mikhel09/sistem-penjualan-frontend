@@ -76,14 +76,14 @@ function RiwayatTransaksi({ token }) {
       ) : (
         <table border="1" cellPadding="8" style={{ borderCollapse: 'collapse' }}>
           <thead>
-            <tr><th>ID</th><th>Tanggal</th><th>Kasir</th><th>Total</th><th></th></tr>
-          </thead>
+            <tr><th>ID</th><th>Tanggal</th><th>Kasir</th><th>Cabang</th><th>Total</th><th></th></tr>          </thead>
           <tbody>
             {transaksiList.map((t) => (
               <tr key={t.id}>
                 <td>{t.id}</td>
                 <td>{formatTanggal(t.created_at)}</td>
                 <td>{t.nama_kasir}</td>
+                <td>{t.nama_toko}</td>
                 <td>Rp {Number(t.total).toLocaleString('id-ID')}</td>
                 <td>
                   <button onClick={() => lihatDetail(t.id)} disabled={loading}>
