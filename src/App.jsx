@@ -3,13 +3,14 @@ import Login from './Login';
 import TambahProduk from './TambahProduk';
 import Kasir from './Kasir';
 import KelolaStaff from './KelolaStaff';
+import RiwayatTransaksi from './RiwayatTransaksi';
 import { API_URL } from './api';
 
 function App() {
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
   const [products, setProducts] = useState([]);
-  const [halaman, setHalaman] = useState('produk'); // 'produk' | 'tambah' | 'kasir' | 'staff'
+  const [halaman, setHalaman] = useState('produk');
   const [produkDiedit, setProdukDiedit] = useState(null);
 
   const handleLoginSuccess = (newToken, newUser) => {
@@ -18,9 +19,7 @@ function App() {
   };
 
   const muatProduk = () => {
-    fetch(`${API_URL}/api/products`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    fetch(`${API_URL}/api/products`, { headers: { Authorization: `Bearer ${token}` } })
       .then((res) => res.json())
       .then(setProducts);
   };
@@ -28,7 +27,6 @@ function App() {
   const hapusProduk = async (id) => {
     const konfirmasi = window.confirm('Yakin mau menghapus produk ini?');
     if (!konfirmasi) return;
-
     try {
       const res = await fetch(`${API_URL}/api/products/${id}`, {
         method: 'DELETE',
@@ -63,6 +61,7 @@ function App() {
           <button onClick={() => { setProdukDiedit(null); setHalaman('tambah'); }}>Tambah Produk</button>
         )}{' '}
         <button onClick={() => setHalaman('kasir')}>Kasir</button>{' '}
+        <button onClick={() => setHalaman('riwayat')}>Riwayat Transaksi</button>{' '}
         {user?.role === 'owner' && (
           <button onClick={() => setHalaman('staff')}>Kelola Staff</button>
         )}
@@ -72,10 +71,7 @@ function App() {
         <table border="1" cellPadding="8" style={{ borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              <th>Nama</th>
-              <th>Harga</th>
-              <th>Stok</th>
-              <th>Detail</th>
+              <th>Nama</th><th>Harga</th><th>Stok</th><th>Detail</th>
               {(user?.role === 'owner' || user?.role === 'admin') && <th>Aksi</th>}
             </tr>
           </thead>
@@ -109,6 +105,8 @@ function App() {
       )}
 
       {halaman === 'kasir' && <Kasir token={token} jenisUsaha={user?.jenis_usaha} />}
+
+      {halaman === 'riwayat' && <RiwayatTransaksi token={token} />}
 
       {halaman === 'staff' && <KelolaStaff token={token} />}
     </div>
