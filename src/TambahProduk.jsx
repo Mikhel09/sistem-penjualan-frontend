@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { API_URL } from './api';
+
 // Field unik per jenis usaha
 const FIELD_PER_KATEGORI = {
   pakaian: [
@@ -16,7 +17,7 @@ const FIELD_PER_KATEGORI = {
   ],
 };
 
-function TambahProduk({ token, jenisUsaha, onProdukDitambahkan }) {
+function TambahProduk({ token, jenisUsaha, onProdukDitambahkan, produkDiedit, onSelesaiEdit }) {
   const [nama, setNama] = useState('');
   const [harga, setHarga] = useState('');
   const [stok, setStok] = useState('');
@@ -24,6 +25,22 @@ function TambahProduk({ token, jenisUsaha, onProdukDitambahkan }) {
   const [message, setMessage] = useState('');
 
   const fieldsKategori = FIELD_PER_KATEGORI[jenisUsaha] || [];
+  const isEdit = Boolean(produkDiedit);
+
+  // Kalau ada produk yang mau diedit, isi form otomatis dengan data produk itu
+  useEffect(() => {
+    if (produkDiedit) {
+      setNama(produkDiedit.nama);
+      setHarga(produkDiedit.harga);
+      setStok(produkDiedit.stok);
+      setAttrValues(produkDiedit.attributes || {});
+    } else {
+      setNama('');
+      setHarga('');
+      setStok('');
+      setAttrValues({});
+    }
+  }, [produkDiedit]);
 
   const handleAttrChange = (key, value) => {
     setAttrValues((prev) => ({ ...prev, [key]: value }));
@@ -32,9 +49,13 @@ function TambahProduk({ token, jenisUsaha, onProdukDitambahkan }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
+
+    const url = isEdit ? `${API_URL}/api/products/${produkDiedit.id}` : `${API_URL}/api/products`;
+    const method = isEdit ? 'PUT' : 'POST';
+
     try {
-      const res = await fetch(`${API_URL}/api/products`, {
-        method: 'POST',
+      const res = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
@@ -48,15 +69,18 @@ function TambahProduk({ token, jenisUsaha, onProdukDitambahkan }) {
       });
       const data = await res.json();
       if (!res.ok) {
-        setMessage(data.error || 'Gagal menambah produk');
+        setMessage(data.error || 'Gagal menyimpan produk');
         return;
       }
-      setMessage('Produk berhasil ditambahkan!');
+
+      setMessage(isEdit ? 'Produk berhasil diubah!' : 'Produk berhasil ditambahkan!');
       setNama('');
       setHarga('');
       setStok('');
       setAttrValues({});
+
       if (onProdukDitambahkan) onProdukDitambahkan();
+      if (isEdit && onSelesaiEdit) onSelesaiEdit();
     } catch (err) {
       setMessage('Tidak bisa terhubung ke server');
     }
@@ -64,7 +88,7 @@ function TambahProduk({ token, jenisUsaha, onProdukDitambahkan }) {
 
   return (
     <div style={{ padding: '1rem', border: '1px solid #ccc', borderRadius: '8px', maxWidth: '400px' }}>
-      <h3>Tambah Produk ({jenisUsaha})</h3>
+      <h3>{isEdit ? 'Edit Produk' : 'Tambah Produk'} ({jenisUsaha})</h3>
       <form onSubmit={handleSubmit}>
         <div style={{ marginBottom: '0.75rem' }}>
           <label>Nama Produk</label>
@@ -79,7 +103,6 @@ function TambahProduk({ token, jenisUsaha, onProdukDitambahkan }) {
           <input type="number" value={stok} onChange={(e) => setStok(e.target.value)} required style={{ width: '100%', padding: '6px' }} />
         </div>
 
-        {/* Field yang muncul otomatis sesuai jenis usaha */}
         {fieldsKategori.map((field) => (
           <div key={field.key} style={{ marginBottom: '0.75rem' }}>
             <label>{field.label}</label>
@@ -92,7 +115,14 @@ function TambahProduk({ token, jenisUsaha, onProdukDitambahkan }) {
           </div>
         ))}
 
-        <button type="submit" style={{ padding: '8px 16px' }}>Simpan Produk</button>
+        <button type="submit" style={{ padding: '8px 16px' }}>
+          {isEdit ? 'Simpan Perubahan' : 'Simpan Produk'}
+        </button>
+        {isEdit && (
+          <button type="button" onClick={onSelesaiEdit} style={{ padding: '8px 16px', marginLeft: '8px' }}>
+            Batal
+          </button>
+        )}
       </form>
       {message && <p>{message}</p>}
     </div>
