@@ -104,7 +104,7 @@ function App() {
         />
       )}
 
-      {halaman === 'kasir' && <Kasir token={token} jenisUsaha={user?.jenis_usaha} />}
+      {halaman === 'kasir' && <Kasir token={token} jenisUsaha={user?.jenis_usaha} namaBisnis={user?.nama_bisnis} />}
 
       {halaman === 'riwayat' && <RiwayatTransaksi token={token} />}
 
