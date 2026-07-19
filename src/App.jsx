@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import Login from './Login';
+import LupaPassword from './LupaPassword';
+import ResetPassword from './ResetPassword';
 import TambahProduk from './TambahProduk';
 import Kasir from './Kasir';
 import KelolaStaff from './KelolaStaff';
@@ -13,6 +15,11 @@ function App() {
   const [products, setProducts] = useState([]);
   const [halaman, setHalaman] = useState('produk');
   const [produkDiedit, setProdukDiedit] = useState(null);
+  const [tampilanAuth, setTampilanAuth] = useState('login'); // 'login' | 'lupa-password'
+
+  // Cek apakah URL saat ini mengandung ?token=... (artinya user klik link dari email)
+  const urlParams = new URLSearchParams(window.location.search);
+  const resetToken = urlParams.get('token');
 
   const handleLoginSuccess = (newToken, newUser) => {
     setToken(newToken);
@@ -48,10 +55,20 @@ function App() {
     if (token) muatProduk();
   }, [token]);
 
-  if (!token) {
-    return <Login onLoginSuccess={handleLoginSuccess} />;
+  // Prioritas 1: kalau ada token reset password di URL, tampilkan halaman itu dulu
+  if (resetToken) {
+    return <ResetPassword token={resetToken} />;
   }
 
+  // Prioritas 2: belum login
+  if (!token) {
+    if (tampilanAuth === 'lupa-password') {
+      return <LupaPassword onKembali={() => setTampilanAuth('login')} />;
+    }
+    return <Login onLoginSuccess={handleLoginSuccess} onLupaPassword={() => setTampilanAuth('lupa-password')} />;
+  }
+
+  // Prioritas 3: sudah login, tampilan utama aplikasi
   return (
     <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
       <h1>{user?.nama_bisnis} — {user?.nama}</h1>

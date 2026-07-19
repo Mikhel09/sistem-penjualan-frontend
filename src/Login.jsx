@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { API_URL } from './api';
 
-function Login({ onLoginSuccess }) {
+function Login({ onLoginSuccess, onLupaPassword }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -55,6 +55,9 @@ function Login({ onLoginSuccess }) {
           Login
         </button>
       </form>
+      <button onClick={onLupaPassword} style={{ marginTop: '1rem', background: 'none', border: 'none', color: 'blue', cursor: 'pointer' }}>
+        Lupa password?
+      </button>
     </div>
   );
 }
