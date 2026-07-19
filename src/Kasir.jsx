@@ -14,6 +14,7 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
 
   const butuhPilihCabang = !storeIdUser;
   const storeIdAktif = storeIdUser || storeIdDipilih;
+  const [metodeBayar, setMetodeBayar] = useState('tunai');
 
   useEffect(() => {
     if (butuhPilihCabang) {
@@ -68,6 +69,8 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
           no_meja: jenisUsaha === 'makanan_minuman' ? noMeja : undefined,
           catatan: jenisUsaha === 'makanan_minuman' ? catatan : undefined,
           store_id: Number(storeIdAktif),
+          payment_method: metodeBayar,
+
         }),
       });
       const data = await res.json();
@@ -131,7 +134,10 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
           </div>
           {strukData.transaksi.no_meja && <p>No. Meja: {strukData.transaksi.no_meja}</p>}
           {strukData.transaksi.catatan && <p>Catatan: {strukData.transaksi.catatan}</p>}
-          <p style={{ textAlign: 'center', marginTop: '1rem' }}>Terima kasih!</p>
+          <p>Metode Bayar: {strukData.transaksi.payment_method?.toUpperCase()}</p>
+          <p style={{ textAlign: 'center', marginTop: '1rem' }}>
+            Terima kasih!
+          </p>
         </div>
         <div className="no-print" style={{ marginTop: '1rem' }}>
           <button onClick={() => window.print()}>Cetak Struk</button>{' '}
@@ -197,6 +203,14 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
             <hr />
             <strong>Total: Rp {totalKeranjang.toLocaleString('id-ID')}</strong>
             <br />
+            <div style={{ marginBottom: '1rem' }}>
+            <label>Metode Bayar: </label>
+              <select value={metodeBayar} onChange={(e) => setMetodeBayar(e.target.value)} style={{ padding: '4px' }}>
+                <option value="tunai">Tunai</option>
+                <option value="kartu">Kartu</option>
+                <option value="qris">QRIS</option>
+              </select>
+          </div>
             <button onClick={bayar} style={{ marginTop: '8px', padding: '8px 16px' }}>
               Bayar
             </button>

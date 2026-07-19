@@ -42,6 +42,7 @@ function RiwayatTransaksi({ token }) {
         <h3>Detail Transaksi #{detailTransaksi.transaksi.id}</h3>
         <p>Tanggal: {formatTanggal(detailTransaksi.transaksi.created_at)}</p>
         <p>Kasir: {detailTransaksi.transaksi.nama_kasir}</p>
+        <p>Metode Bayar: {detailTransaksi.transaksi.payment_method?.toUpperCase()}</p>
         {detailTransaksi.transaksi.no_meja && <p>No. Meja: {detailTransaksi.transaksi.no_meja}</p>}
         {detailTransaksi.transaksi.catatan && <p>Catatan: {detailTransaksi.transaksi.catatan}</p>}
 
