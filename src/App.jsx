@@ -10,6 +10,8 @@ import RiwayatTransaksi from './RiwayatTransaksi';
 import Laporan from './Laporan';
 import Pelanggan from './Pelanggan';
 import { API_URL } from './api';
+import KelolaSupplier from './KelolaSupplier';
+import Restock from './Restock';
 
 const MENU = [
   { key: 'produk', label: 'Daftar Produk', icon: '📦', roles: ['owner', 'admin', 'kasir'] },
@@ -20,6 +22,8 @@ const MENU = [
   { key: 'laporan', label: 'Laporan', icon: '📊', roles: ['owner', 'admin'] },
   { key: 'staff', label: 'Kelola Staff', icon: '🧑‍💼', roles: ['owner'] },
   { key: 'cabang', label: 'Kelola Cabang', icon: '🏬', roles: ['owner'] },
+  { key: 'supplier', label: 'Supplier', icon: '🚚', roles: ['owner', 'admin'] },
+  { key: 'restock', label: 'Restock', icon: '📥', roles: ['owner', 'admin'] },
 ];
 
 function App() {
@@ -218,6 +222,10 @@ function App() {
           {halaman === 'cabang' && <KelolaCabang token={token} />}
 
           {halaman === 'pelanggan' && <Pelanggan token={token} />}
+
+          {halaman === 'supplier' && <KelolaSupplier token={token} />}
+
+          {halaman === 'restock' && <Restock token={token} storeIdUser={user?.store_id} />}
         </main>
       </div>
     </div>
