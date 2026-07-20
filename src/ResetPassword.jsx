@@ -34,38 +34,46 @@ function ResetPassword({ token }) {
     }
   };
 
-  if (berhasil) {
-    return (
-      <div style={{ padding: '2rem', fontFamily: 'sans-serif', maxWidth: '320px' }}>
-        <p>{message}</p>
-        <a href="/">Kembali ke halaman login</a>
-      </div>
-    );
-  }
-
   return (
-    <div style={{ padding: '2rem', fontFamily: 'sans-serif', maxWidth: '320px' }}>
-      <h2>Buat Password Baru</h2>
-      <form onSubmit={handleSubmit}>
-        <input
-          type="password"
-          placeholder="Password baru"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{ width: '100%', padding: '8px', marginBottom: '1rem' }}
-          required
-        />
-        <input
-          type="password"
-          placeholder="Konfirmasi password baru"
-          value={konfirmasiPassword}
-          onChange={(e) => setKonfirmasiPassword(e.target.value)}
-          style={{ width: '100%', padding: '8px', marginBottom: '1rem' }}
-          required
-        />
-        <button type="submit" style={{ width: '100%', padding: '8px' }}>Simpan Password Baru</button>
-      </form>
-      {message && <p>{message}</p>}
+    <div className="auth-page">
+      <div className="auth-card">
+        <div className="auth-logo">SP</div>
+        <h1 className="auth-title">Buat Password Baru</h1>
+
+        {berhasil ? (
+          <>
+            <div className="alert alert-success">{message}</div>
+            <div className="auth-link-row">
+              <a href="/" className="auth-link">Kembali ke halaman login</a>
+            </div>
+          </>
+        ) : (
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label className="form-label">Password Baru</label>
+              <input
+                type="password"
+                className="input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Konfirmasi Password</label>
+              <input
+                type="password"
+                className="input"
+                value={konfirmasiPassword}
+                onChange={(e) => setKonfirmasiPassword(e.target.value)}
+                required
+              />
+            </div>
+            {message && <div className="alert alert-error">{message}</div>}
+            <button type="submit" className="btn btn-primary btn-block">Simpan Password Baru</button>
+          </form>
+        )}
+      </div>
     </div>
   );
 }

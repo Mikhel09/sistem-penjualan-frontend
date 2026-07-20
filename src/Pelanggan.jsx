@@ -42,23 +42,40 @@ function Pelanggan({ token }) {
 
   return (
     <div>
-      <h3>Daftarkan Pelanggan Baru</h3>
-      <form onSubmit={handleSubmit} style={{ maxWidth: '300px', marginBottom: '2rem' }}>
-        <input placeholder="Nama" value={nama} onChange={(e) => setNama(e.target.value)} required style={{ width: '100%', padding: '6px', marginBottom: '8px' }} />
-        <input placeholder="Nomor Telepon" value={telepon} onChange={(e) => setTelepon(e.target.value)} required style={{ width: '100%', padding: '6px', marginBottom: '8px' }} />
-        <button type="submit" style={{ padding: '8px 16px' }}>Daftarkan</button>
-      </form>
-      {message && <p>{message}</p>}
+      <div className="card" style={{ maxWidth: '420px' }}>
+        <h2 className="card-title">Daftarkan Pelanggan Baru</h2>
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label className="form-label">Nama</label>
+            <input className="input" value={nama} onChange={(e) => setNama(e.target.value)} required />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Nomor Telepon</label>
+            <input className="input" value={telepon} onChange={(e) => setTelepon(e.target.value)} required />
+          </div>
+          <button type="submit" className="btn btn-primary">Daftarkan</button>
+        </form>
+        {message && <div className="alert alert-success" style={{ marginTop: '1rem' }}>{message}</div>}
+      </div>
 
-      <h3>Daftar Pelanggan</h3>
-      <table border="1" cellPadding="8" style={{ borderCollapse: 'collapse' }}>
-        <thead><tr><th>Nama</th><th>Telepon</th><th>Poin</th></tr></thead>
-        <tbody>
-          {pelangganList.map((c) => (
-            <tr key={c.id}><td>{c.nama}</td><td>{c.telepon}</td><td>{c.poin}</td></tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="card">
+        <h2 className="card-title">Daftar Pelanggan</h2>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead><tr><th>Nama</th><th>Telepon</th><th>Poin</th></tr></thead>
+            <tbody>
+              {pelangganList.map((c) => (
+                <tr key={c.id}>
+                  <td>{c.nama}</td>
+                  <td>{c.telepon}</td>
+                  <td className="num">{c.poin}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {pelangganList.length === 0 && <div className="empty-state">Belum ada pelanggan.</div>}
+        </div>
+      </div>
     </div>
   );
 }

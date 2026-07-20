@@ -38,10 +38,7 @@ function KelolaStaff({ token }) {
     try {
       const res = await fetch(`${API_URL}/api/users`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ nama, email, password, role, store_id: Number(storeId) }),
       });
       const data = await res.json();
@@ -62,34 +59,63 @@ function KelolaStaff({ token }) {
 
   return (
     <div>
-      <h3>Tambah Staff Baru</h3>
-      <form onSubmit={handleSubmit} style={{ maxWidth: '300px', marginBottom: '2rem' }}>
-        <input placeholder="Nama" value={nama} onChange={(e) => setNama(e.target.value)} required style={{ width: '100%', padding: '6px', marginBottom: '8px' }} />
-        <input placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required style={{ width: '100%', padding: '6px', marginBottom: '8px' }} />
-        <input placeholder="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required style={{ width: '100%', padding: '6px', marginBottom: '8px' }} />
-        <select value={role} onChange={(e) => setRole(e.target.value)} style={{ width: '100%', padding: '6px', marginBottom: '8px' }}>
-          <option value="kasir">Kasir</option>
-          <option value="admin">Admin</option>
-        </select>
-        <select value={storeId} onChange={(e) => setStoreId(e.target.value)} required style={{ width: '100%', padding: '6px', marginBottom: '8px' }}>
-          <option value="">-- Pilih Cabang --</option>
-          {cabangList.map((c) => (
-            <option key={c.id} value={c.id}>{c.nama_toko}</option>
-          ))}
-        </select>
-        <button type="submit" style={{ padding: '8px 16px' }}>Tambah Staff</button>
-      </form>
-      {message && <p>{message}</p>}
+      <div className="card" style={{ maxWidth: '420px' }}>
+        <h2 className="card-title">Tambah Staff Baru</h2>
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label className="form-label">Nama</label>
+            <input className="input" value={nama} onChange={(e) => setNama(e.target.value)} required />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Email</label>
+            <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Password</label>
+            <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label">Role</label>
+              <select className="input" value={role} onChange={(e) => setRole(e.target.value)}>
+                <option value="kasir">Kasir</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label">Cabang</label>
+              <select className="input" value={storeId} onChange={(e) => setStoreId(e.target.value)} required>
+                <option value="">-- Pilih --</option>
+                {cabangList.map((c) => (
+                  <option key={c.id} value={c.id}>{c.nama_toko}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <button type="submit" className="btn btn-primary">Tambah Staff</button>
+        </form>
+        {message && <div className="alert alert-success" style={{ marginTop: '1rem' }}>{message}</div>}
+      </div>
 
-      <h3>Daftar Staff</h3>
-      <table border="1" cellPadding="8" style={{ borderCollapse: 'collapse' }}>
-        <thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Cabang</th></tr></thead>
-        <tbody>
-          {staffList.map((s) => (
-            <tr key={s.id}><td>{s.nama}</td><td>{s.email}</td><td>{s.role}</td><td>{s.nama_toko || '-'}</td></tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="card">
+        <h2 className="card-title">Daftar Staff</h2>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Cabang</th></tr></thead>
+            <tbody>
+              {staffList.map((s) => (
+                <tr key={s.id}>
+                  <td>{s.nama}</td>
+                  <td>{s.email}</td>
+                  <td><span className={`badge badge-${s.role}`}>{s.role}</span></td>
+                  <td>{s.nama_toko || '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {staffList.length === 0 && <div className="empty-state">Belum ada staff.</div>}
+        </div>
+      </div>
     </div>
   );
 }

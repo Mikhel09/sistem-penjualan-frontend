@@ -33,57 +33,65 @@ function Laporan({ token }) {
   };
 
   useEffect(() => {
-    muatLaporan(); // otomatis muat laporan 30 hari terakhir waktu halaman dibuka
+    muatLaporan();
   }, []);
 
   return (
     <div>
-      <h3>Laporan Penjualan</h3>
-
-      <div style={{ marginBottom: '1rem' }}>
-        <label>Dari: </label>
-        <input type="date" value={dari} onChange={(e) => setDari(e.target.value)} style={{ marginRight: '1rem' }} />
-        <label>Sampai: </label>
-        <input type="date" value={sampai} onChange={(e) => setSampai(e.target.value)} style={{ marginRight: '1rem' }} />
-        <button onClick={muatLaporan} disabled={loading}>
-          {loading ? 'Memuat...' : 'Tampilkan'}
-        </button>
+      <div className="card">
+        <div className="page-header">
+          <h2 className="page-title">Laporan Penjualan</h2>
+        </div>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">Dari</label>
+            <input className="input" type="date" value={dari} onChange={(e) => setDari(e.target.value)} />
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">Sampai</label>
+            <input className="input" type="date" value={sampai} onChange={(e) => setSampai(e.target.value)} />
+          </div>
+          <button className="btn btn-primary" onClick={muatLaporan} disabled={loading}>
+            {loading ? 'Memuat...' : 'Tampilkan'}
+          </button>
+        </div>
       </div>
 
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {error && <div className="alert alert-error">{error}</div>}
 
       {data && (
         <>
-          <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
-            <div style={{ border: '1px solid #ccc', borderRadius: '8px', padding: '1rem', minWidth: '180px' }}>
-              <p style={{ margin: 0, color: '#666' }}>Total Omset</p>
-              <h2 style={{ margin: 0 }}>Rp {Number(data.total_omset).toLocaleString('id-ID')}</h2>
+          <div className="stat-grid">
+            <div className="stat-card">
+              <div className="stat-label">Total Omset</div>
+              <div className="stat-value">Rp {Number(data.total_omset).toLocaleString('id-ID')}</div>
             </div>
-            <div style={{ border: '1px solid #ccc', borderRadius: '8px', padding: '1rem', minWidth: '180px' }}>
-              <p style={{ margin: 0, color: '#666' }}>Jumlah Transaksi</p>
-              <h2 style={{ margin: 0 }}>{data.jumlah_transaksi}</h2>
+            <div className="stat-card">
+              <div className="stat-label">Jumlah Transaksi</div>
+              <div className="stat-value">{data.jumlah_transaksi}</div>
             </div>
           </div>
 
-          <h4>Produk Terlaris</h4>
-          {data.produk_terlaris.length === 0 ? (
-            <p>Belum ada penjualan di periode ini.</p>
-          ) : (
-            <table border="1" cellPadding="8" style={{ borderCollapse: 'collapse' }}>
-              <thead>
-                <tr><th>Produk</th><th>Jumlah Terjual</th><th>Total Omset Produk</th></tr>
-              </thead>
-              <tbody>
-                {data.produk_terlaris.map((p, index) => (
-                  <tr key={index}>
-                    <td>{p.nama}</td>
-                    <td>{p.total_terjual}</td>
-                    <td>Rp {Number(p.total_omset_produk).toLocaleString('id-ID')}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+          <div className="card">
+            <h3 className="card-title">Produk Terlaris</h3>
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr><th>Produk</th><th>Jumlah Terjual</th><th>Total Omset Produk</th></tr>
+                </thead>
+                <tbody>
+                  {data.produk_terlaris.map((p, index) => (
+                    <tr key={index}>
+                      <td>{p.nama}</td>
+                      <td className="num">{p.total_terjual}</td>
+                      <td className="num">Rp {Number(p.total_omset_produk).toLocaleString('id-ID')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {data.produk_terlaris.length === 0 && <div className="empty-state">Belum ada penjualan di periode ini.</div>}
+            </div>
+          </div>
         </>
       )}
     </div>

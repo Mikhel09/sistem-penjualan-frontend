@@ -26,23 +26,35 @@ function LupaPassword({ onKembali }) {
   };
 
   return (
-    <div style={{ padding: '2rem', fontFamily: 'sans-serif', maxWidth: '320px' }}>
-      <h2>Lupa Password</h2>
-      <form onSubmit={handleSubmit}>
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={{ width: '100%', padding: '8px', marginBottom: '1rem' }}
-          required
-        />
-        <button type="submit" disabled={loading} style={{ width: '100%', padding: '8px' }}>
-          {loading ? 'Mengirim...' : 'Kirim Link Reset'}
-        </button>
-      </form>
-      {message && <p>{message}</p>}
-      <button onClick={onKembali} style={{ marginTop: '1rem' }}>← Kembali ke Login</button>
+    <div className="auth-page">
+      <div className="auth-card">
+        <div className="auth-logo">SP</div>
+        <h1 className="auth-title">Lupa Password</h1>
+        <p className="auth-subtitle">Masukkan email akunmu, kami kirim link untuk membuat password baru.</p>
+
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label className="form-label">Email</label>
+            <input
+              type="email"
+              className="input"
+              placeholder="nama@bisnis.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
+            {loading ? 'Mengirim...' : 'Kirim Link Reset'}
+          </button>
+        </form>
+
+        {message && <div className="alert alert-success" style={{ marginTop: '1rem' }}>{message}</div>}
+
+        <div className="auth-link-row">
+          <button className="auth-link" onClick={onKembali}>← Kembali ke Login</button>
+        </div>
+      </div>
     </div>
   );
 }
