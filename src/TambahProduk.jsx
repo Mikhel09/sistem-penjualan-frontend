@@ -102,13 +102,13 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
   };
 
   return (
-    <div style={{ padding: '1rem', border: '1px solid #ccc', borderRadius: '8px', maxWidth: '400px' }}>
-      <h3>{isEdit ? 'Edit Produk' : 'Tambah Produk'} ({jenisUsaha})</h3>
+    <div className="card" style={{ maxWidth: '480px' }}>
+      <h2 className="card-title">{isEdit ? 'Edit Produk' : 'Tambah Produk'} · <span className={`badge badge-${jenisUsaha}`}>{jenisUsaha}</span></h2>
       <form onSubmit={handleSubmit}>
         {butuhPilihCabang && !isEdit && (
-          <div style={{ marginBottom: '0.75rem' }}>
-            <label>Cabang</label>
-            <select value={storeIdDipilih} onChange={(e) => setStoreIdDipilih(e.target.value)} style={{ width: '100%', padding: '6px' }}>
+          <div className="form-group">
+            <label className="form-label">Cabang</label>
+            <select className="input" value={storeIdDipilih} onChange={(e) => setStoreIdDipilih(e.target.value)}>
               <option value="">-- Pilih Cabang --</option>
               {cabangList.map((c) => (
                 <option key={c.id} value={c.id}>{c.nama_toko}</option>
@@ -117,45 +117,50 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
           </div>
         )}
 
-        <div style={{ marginBottom: '0.75rem' }}>
-          <label>Nama Produk</label>
-          <input value={nama} onChange={(e) => setNama(e.target.value)} required style={{ width: '100%', padding: '6px' }} />
+        <div className="form-group">
+          <label className="form-label">Nama Produk</label>
+          <input className="input" value={nama} onChange={(e) => setNama(e.target.value)} required />
         </div>
-        <div style={{ marginBottom: '0.75rem' }}>
-          <label>Harga</label>
-          <input type="number" value={harga} onChange={(e) => setHarga(e.target.value)} required style={{ width: '100%', padding: '6px' }} />
-        </div>
-        <div style={{ marginBottom: '0.75rem' }}>
-          <label>Stok</label>
-          <input type="number" value={stok} onChange={(e) => setStok(e.target.value)} required style={{ width: '100%', padding: '6px' }} />
-        </div>
-        <div style={{ marginBottom: '0.75rem' }}>
-          <label>Stok Minimum (batas peringatan)</label>
-          <input type="number" value={stokMinimum} onChange={(e) => setStokMinimum(e.target.value)} style={{ width: '100%', padding: '6px' }} />
+
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <div className="form-group" style={{ flex: 1 }}>
+            <label className="form-label">Harga</label>
+            <input className="input" type="number" value={harga} onChange={(e) => setHarga(e.target.value)} required />
+          </div>
+          <div className="form-group" style={{ flex: 1 }}>
+            <label className="form-label">Stok</label>
+            <input className="input" type="number" value={stok} onChange={(e) => setStok(e.target.value)} required />
+          </div>
+          <div className="form-group" style={{ flex: 1 }}>
+            <label className="form-label">Stok Minimum</label>
+            <input className="input" type="number" value={stokMinimum} onChange={(e) => setStokMinimum(e.target.value)} />
+          </div>
         </div>
 
         {fieldsKategori.map((field) => (
-          <div key={field.key} style={{ marginBottom: '0.75rem' }}>
-            <label>{field.label}</label>
+          <div key={field.key} className="form-group">
+            <label className="form-label">{field.label}</label>
             <input
+              className="input"
               placeholder={field.placeholder}
               value={attrValues[field.key] || ''}
               onChange={(e) => handleAttrChange(field.key, e.target.value)}
-              style={{ width: '100%', padding: '6px' }}
             />
           </div>
         ))}
 
-        <button type="submit" style={{ padding: '8px 16px' }}>
-          {isEdit ? 'Simpan Perubahan' : 'Simpan Produk'}
-        </button>
-        {isEdit && (
-          <button type="button" onClick={onSelesaiEdit} style={{ padding: '8px 16px', marginLeft: '8px' }}>
-            Batal
+        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+          <button type="submit" className="btn btn-primary">
+            {isEdit ? 'Simpan Perubahan' : 'Simpan Produk'}
           </button>
-        )}
+          {isEdit && (
+            <button type="button" className="btn btn-secondary" onClick={onSelesaiEdit}>
+              Batal
+            </button>
+          )}
+        </div>
       </form>
-      {message && <p>{message}</p>}
+      {message && <div className="alert alert-success" style={{ marginTop: '1rem' }}>{message}</div>}
     </div>
   );
 }
