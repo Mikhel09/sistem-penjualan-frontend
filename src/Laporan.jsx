@@ -4,6 +4,7 @@ import { API_URL } from './api';
 
 function Laporan({ token }) {
   const [dari, setDari] = useState('');
+
   const [sampai, setSampai] = useState('');
   const [data, setData] = useState(null);
   const [grafikData, setGrafikData] = useState([]);
@@ -53,7 +54,7 @@ function Laporan({ token }) {
     <div>
       <div className="card">
         <div className="page-header">
-          <h2 className="page-title">Laporan Penjualan</h2>
+          <h2 className="page-title">Laporan Penjualan:</h2>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div className="form-group" style={{ marginBottom: 0 }}>
