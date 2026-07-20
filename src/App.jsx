@@ -9,6 +9,7 @@ import KelolaCabang from './KelolaCabang';
 import RiwayatTransaksi from './RiwayatTransaksi';
 import Laporan from './Laporan';
 import { API_URL } from './api';
+import Pelanggan from './Pelanggan';
 
 function App() {
   const [token, setToken] = useState(null);
@@ -107,6 +108,7 @@ function App() {
           <>
             <button onClick={() => setHalaman('staff')}>Kelola Staff</button>{' '}
             <button onClick={() => setHalaman('cabang')}>Kelola Cabang</button>
+            <button onClick={() => setHalaman('pelanggan')}>Pelanggan</button>{' '}
           </>
         )}
       </nav>
@@ -167,6 +169,8 @@ function App() {
       {halaman === 'staff' && <KelolaStaff token={token} />}
 
       {halaman === 'cabang' && <KelolaCabang token={token} />}
+
+      {halaman === 'pelanggan' && <Pelanggan token={token} />}
     </div>
   );
 }

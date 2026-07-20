@@ -15,6 +15,9 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
   const butuhPilihCabang = !storeIdUser;
   const storeIdAktif = storeIdUser || storeIdDipilih;
   const [metodeBayar, setMetodeBayar] = useState('tunai');
+  const [teleponCari, setTeleponCari] = useState('');
+  const [pelangganDipilih, setPelangganDipilih] = useState(null);
+  const [pesanPelanggan, setPesanPelanggan] = useState('');
 
   useEffect(() => {
     if (butuhPilihCabang) {
@@ -70,6 +73,8 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
           catatan: jenisUsaha === 'makanan_minuman' ? catatan : undefined,
           store_id: Number(storeIdAktif),
           payment_method: metodeBayar,
+          customer_id: pelangganDipilih?.id,
+
 
         }),
       });
@@ -88,9 +93,30 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
       setCart([]);
       setNoMeja('');
       setCatatan('');
+      setPelangganDipilih(null);
+      setTeleponCari('');
     } catch (err) {
       setMessage('Tidak bisa terhubung ke server');
     }
+  };
+
+  const cariPelanggan = async (e) => {
+  e.preventDefault();
+  setPesanPelanggan('');
+  try {
+    const res = await fetch(`${API_URL}/api/customers/cari?telepon=${teleponCari}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setPesanPelanggan(data.error);
+      setPelangganDipilih(null);
+      return;
+    }
+    setPelangganDipilih(data);
+  } catch (err) {
+    setPesanPelanggan('Tidak bisa terhubung ke server');
+  }
   };
 
   const transaksiBaru = () => {
@@ -202,18 +228,49 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
             ))}
             <hr />
             <strong>Total: Rp {totalKeranjang.toLocaleString('id-ID')}</strong>
-            <br />
-            <div style={{ marginBottom: '1rem' }}>
-            <label>Metode Bayar: </label>
-              <select value={metodeBayar} onChange={(e) => setMetodeBayar(e.target.value)} style={{ padding: '4px' }}>
-                <option value="tunai">Tunai</option>
-                <option value="kartu">Kartu</option>
-                <option value="qris">QRIS</option>
-              </select>
-          </div>
-            <button onClick={bayar} style={{ marginTop: '8px', padding: '8px 16px' }}>
-              Bayar
-            </button>
+<br />
+
+<div style={{ marginBottom: '1rem' }}>
+  <form onSubmit={cariPelanggan} style={{ marginBottom: '4px' }}>
+    <input
+      placeholder="Cari pelanggan (no. telepon)"
+      value={teleponCari}
+      onChange={(e) => setTeleponCari(e.target.value)}
+      style={{ padding: '4px', width: '180px' }}
+    />
+    <button type="submit">Cari</button>
+  </form>
+
+  {pelangganDipilih && (
+    <p>
+      Pelanggan: {pelangganDipilih.nama} (Poin: {pelangganDipilih.poin})
+    </p>
+  )}
+
+  {pesanPelanggan && (
+    <p style={{ color: 'red' }}>{pesanPelanggan}</p>
+  )}
+</div>
+
+<div style={{ marginBottom: '1rem' }}>
+  <label>Metode Bayar: </label>
+  <select
+    value={metodeBayar}
+    onChange={(e) => setMetodeBayar(e.target.value)}
+    style={{ padding: '4px' }}
+  >
+    <option value="tunai">Tunai</option>
+    <option value="kartu">Kartu</option>
+    <option value="qris">QRIS</option>
+  </select>
+</div>
+
+<button
+  onClick={bayar}
+  style={{ marginTop: '8px', padding: '8px 16px' }}
+>
+  Bayar
+</button>
           </>
         )}
         {message && <p>{message}</p>}
