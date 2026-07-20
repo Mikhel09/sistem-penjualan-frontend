@@ -8,13 +8,25 @@ import KelolaStaff from './KelolaStaff';
 import KelolaCabang from './KelolaCabang';
 import RiwayatTransaksi from './RiwayatTransaksi';
 import Laporan from './Laporan';
-import { API_URL } from './api';
 import Pelanggan from './Pelanggan';
+import { API_URL } from './api';
+
+const MENU = [
+  { key: 'produk', label: 'Daftar Produk', icon: '📦', roles: ['owner', 'admin', 'kasir'] },
+  { key: 'tambah', label: 'Tambah Produk', icon: '➕', roles: ['owner', 'admin'] },
+  { key: 'kasir', label: 'Kasir', icon: '🧾', roles: ['owner', 'admin', 'kasir'] },
+  { key: 'riwayat', label: 'Riwayat Transaksi', icon: '🕒', roles: ['owner', 'admin', 'kasir'] },
+  { key: 'pelanggan', label: 'Pelanggan', icon: '👤', roles: ['owner', 'admin', 'kasir'] },
+  { key: 'laporan', label: 'Laporan', icon: '📊', roles: ['owner', 'admin'] },
+  { key: 'staff', label: 'Kelola Staff', icon: '🧑‍💼', roles: ['owner'] },
+  { key: 'cabang', label: 'Kelola Cabang', icon: '🏬', roles: ['owner'] },
+];
 
 function App() {
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
   const [products, setProducts] = useState([]);
+  const [produkMenipis, setProdukMenipis] = useState([]);
   const [halaman, setHalaman] = useState('produk');
   const [produkDiedit, setProdukDiedit] = useState(null);
   const [tampilanAuth, setTampilanAuth] = useState('login');
@@ -27,10 +39,22 @@ function App() {
     setUser(newUser);
   };
 
+  const handleLogout = () => {
+    setToken(null);
+    setUser(null);
+    setHalaman('produk');
+  };
+
   const muatProduk = () => {
     fetch(`${API_URL}/api/products`, { headers: { Authorization: `Bearer ${token}` } })
       .then((res) => res.json())
       .then(setProducts);
+  };
+
+  const muatProdukMenipis = () => {
+    fetch(`${API_URL}/api/products/stok-menipis/list`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => res.json())
+      .then(setProdukMenipis);
   };
 
   const hapusProduk = async (id) => {
@@ -47,27 +71,18 @@ function App() {
         return;
       }
       muatProduk();
+      muatProdukMenipis();
     } catch (err) {
       alert('Tidak bisa terhubung ke server');
     }
   };
 
-  const [produkMenipis, setProdukMenipis] = useState([]);
-
-  const muatProdukMenipis = () => {
-  fetch(`${API_URL}/api/products/stok-menipis/list`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-    .then((res) => res.json())
-    .then(setProdukMenipis);
-};
-
   useEffect(() => {
-  if (token) {
-    muatProduk();
-    muatProdukMenipis();
-  }
-}, [token]);
+    if (token) {
+      muatProduk();
+      muatProdukMenipis();
+    }
+  }, [token]);
 
   if (resetToken) {
     return <ResetPassword token={resetToken} />;
@@ -80,97 +95,131 @@ function App() {
     return <Login onLoginSuccess={handleLoginSuccess} onLupaPassword={() => setTampilanAuth('lupa-password')} />;
   }
 
+  const menuUntukRole = MENU.filter((m) => m.roles.includes(user?.role));
+
   return (
-    <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
-      <h1>{user?.nama_bisnis} — {user?.nama} {user?.nama_toko ? `(${user.nama_toko})` : '(Semua Cabang)'}</h1>
-      {produkMenipis.length > 0 && (
-  <div style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '8px', padding: '1rem', marginBottom: '1rem' }}>
-    <strong>⚠️ Stok Menipis:</strong>
-    <ul style={{ margin: '8px 0 0 0' }}>
-      {produkMenipis.map((p) => (
-        <li key={p.id}>{p.nama} — sisa {p.stok} (batas: {p.stok_minimum}){p.nama_toko ? ` — ${p.nama_toko}` : ''}</li>
-      ))}
-    </ul>
-  </div>
-)}
+    <div className="app-shell">
+      <aside className="sidebar">
+        <div className="sidebar-brand">
+          <div className="sidebar-brand-name">{user?.nama_bisnis}</div>
+          <div className="sidebar-brand-sub">{user?.nama_toko ? user.nama_toko : 'Semua Cabang'}</div>
+        </div>
 
-      <nav style={{ marginBottom: '1rem' }}>
-        <button onClick={() => setHalaman('produk')}>Daftar Produk</button>{' '}
-        {(user?.role === 'owner' || user?.role === 'admin') && (
-          <button onClick={() => { setProdukDiedit(null); setHalaman('tambah'); }}>Tambah Produk</button>
-        )}{' '}
-        <button onClick={() => setHalaman('kasir')}>Kasir</button>{' '}
-        <button onClick={() => setHalaman('riwayat')}>Riwayat Transaksi</button>{' '}
-        {(user?.role === 'owner' || user?.role === 'admin') && (
-          <button onClick={() => setHalaman('laporan')}>Laporan</button>
-        )}{' '}
-        {user?.role === 'owner' && (
-          <>
-            <button onClick={() => setHalaman('staff')}>Kelola Staff</button>{' '}
-            <button onClick={() => setHalaman('cabang')}>Kelola Cabang</button>
-            <button onClick={() => setHalaman('pelanggan')}>Pelanggan</button>{' '}
-          </>
-        )}
-      </nav>
+        <nav className="sidebar-nav">
+          {menuUntukRole.map((m) => (
+            <button
+              key={m.key}
+              className={`sidebar-nav-item ${halaman === m.key ? 'active' : ''}`}
+              onClick={() => {
+                if (m.key === 'tambah') setProdukDiedit(null);
+                setHalaman(m.key);
+              }}
+            >
+              <span className="sidebar-icon">{m.icon}</span>
+              {m.label}
+            </button>
+          ))}
+        </nav>
 
-      {halaman === 'produk' && (
-        <table border="1" cellPadding="8" style={{ borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th>Nama</th><th>Harga</th><th>Stok</th><th>Cabang</th><th>Detail</th>
-              {(user?.role === 'owner' || user?.role === 'admin') && <th>Aksi</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {products.map((p) => (
-              <tr key={p.id}>
-                <td>{p.nama}</td>
-                <td>Rp {Number(p.harga).toLocaleString('id-ID')}</td>
-                <td>{p.stok}</td>
-                <td>{p.nama_toko}</td>
-                <td>{JSON.stringify(p.attributes)}</td>
-                {(user?.role === 'owner' || user?.role === 'admin') && (
-                  <td>
-                    <button onClick={() => { setProdukDiedit(p); setHalaman('tambah'); }}>Edit</button>{' '}
-                    <button onClick={() => hapusProduk(p.id)}>Hapus</button>
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+        <div className="sidebar-footer">
+          <button className="btn btn-secondary btn-block btn-sm" onClick={handleLogout}>
+            Keluar
+          </button>
+        </div>
+      </aside>
 
-      {halaman === 'tambah' && (
-        <TambahProduk
-          token={token}
-          jenisUsaha={user?.jenis_usaha}
-          storeIdUser={user?.store_id}
-          onProdukDitambahkan={() => { 
-            muatProduk(); 
-            muatProdukMenipis(); 
-          }}
-          produkDiedit={produkDiedit}
-          onSelesaiEdit={() => { 
-            setProdukDiedit(null); 
-            setHalaman('produk'); 
-    }}
-  />
-)}
+      <div className="main">
+        <header className="topbar">
+          <div>
+            <div className="topbar-title">{MENU.find((m) => m.key === halaman)?.label}</div>
+          </div>
+          <div className="user-chip">
+            <span className={`badge badge-${user?.role}`}>{user?.role}</span>
+            <span>{user?.nama}</span>
+          </div>
+        </header>
 
-      {halaman === 'kasir' && (
-        <Kasir token={token} jenisUsaha={user?.jenis_usaha} namaBisnis={user?.nama_bisnis} storeIdUser={user?.store_id} />
-      )}
+        <main className="content">
+          {produkMenipis.length > 0 && (
+            <div className="alert alert-warning">
+              <strong>⚠️ Stok Menipis</strong>
+              <ul>
+                {produkMenipis.map((p) => (
+                  <li key={p.id}>
+                    {p.nama} — sisa {p.stok} (batas {p.stok_minimum}){p.nama_toko ? ` · ${p.nama_toko}` : ''}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
-      {halaman === 'riwayat' && <RiwayatTransaksi token={token} />}
+          {halaman === 'produk' && (
+            <div className="card">
+              <div className="page-header">
+                <div>
+                  <h2 className="page-title">Daftar Produk</h2>
+                  <p className="page-desc">{products.length} produk terdaftar</p>
+                </div>
+              </div>
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Nama</th><th>Harga</th><th>Stok</th><th>Cabang</th><th>Detail</th>
+                      {(user?.role === 'owner' || user?.role === 'admin') && <th>Aksi</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {products.map((p) => (
+                      <tr key={p.id}>
+                        <td>{p.nama}</td>
+                        <td className="num">Rp {Number(p.harga).toLocaleString('id-ID')}</td>
+                        <td className="num">{p.stok}</td>
+                        <td>{p.nama_toko}</td>
+                        <td style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
+                          {Object.entries(p.attributes || {}).map(([k, v]) => `${k}: ${v}`).join(', ')}
+                        </td>
+                        {(user?.role === 'owner' || user?.role === 'admin') && (
+                          <td>
+                            <button className="btn btn-secondary btn-sm" onClick={() => { setProdukDiedit(p); setHalaman('tambah'); }}>Edit</button>{' '}
+                            <button className="btn btn-danger btn-sm" onClick={() => hapusProduk(p.id)}>Hapus</button>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {products.length === 0 && <div className="empty-state">Belum ada produk. Tambahkan produk pertamamu.</div>}
+              </div>
+            </div>
+          )}
 
-      {halaman === 'laporan' && <Laporan token={token} />}
+          {halaman === 'tambah' && (
+            <TambahProduk
+              token={token}
+              jenisUsaha={user?.jenis_usaha}
+              storeIdUser={user?.store_id}
+              onProdukDitambahkan={() => { muatProduk(); muatProdukMenipis(); }}
+              produkDiedit={produkDiedit}
+              onSelesaiEdit={() => { setProdukDiedit(null); setHalaman('produk'); }}
+            />
+          )}
 
-      {halaman === 'staff' && <KelolaStaff token={token} />}
+          {halaman === 'kasir' && (
+            <Kasir token={token} jenisUsaha={user?.jenis_usaha} namaBisnis={user?.nama_bisnis} storeIdUser={user?.store_id} />
+          )}
 
-      {halaman === 'cabang' && <KelolaCabang token={token} />}
+          {halaman === 'riwayat' && <RiwayatTransaksi token={token} />}
 
-      {halaman === 'pelanggan' && <Pelanggan token={token} />}
+          {halaman === 'laporan' && <Laporan token={token} />}
+
+          {halaman === 'staff' && <KelolaStaff token={token} />}
+
+          {halaman === 'cabang' && <KelolaCabang token={token} />}
+
+          {halaman === 'pelanggan' && <Pelanggan token={token} />}
+        </main>
+      </div>
     </div>
   );
 }
