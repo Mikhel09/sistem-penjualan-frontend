@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { API_URL } from './api';
 
 function Laporan({ token }) {
   const [dari, setDari] = useState('');
   const [sampai, setSampai] = useState('');
   const [data, setData] = useState(null);
+  const [grafikData, setGrafikData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -16,15 +18,26 @@ function Laporan({ token }) {
       if (dari) params.append('dari', dari);
       if (sampai) params.append('sampai', sampai);
 
-      const res = await fetch(`${API_URL}/api/laporan?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const result = await res.json();
-      if (!res.ok) {
-        setError(result.error || 'Gagal mengambil laporan');
+      const [resRingkasan, resGrafik] = await Promise.all([
+        fetch(`${API_URL}/api/laporan?${params.toString()}`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_URL}/api/laporan/grafik?${params.toString()}`, { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+
+      const resultRingkasan = await resRingkasan.json();
+      const resultGrafik = await resGrafik.json();
+
+      if (!resRingkasan.ok) {
+        setError(resultRingkasan.error || 'Gagal mengambil laporan');
         return;
       }
-      setData(result);
+
+      setData(resultRingkasan);
+      setGrafikData(
+        resultGrafik.map((row) => ({
+          tanggal: new Date(row.tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }),
+          total: Number(row.total_harian),
+        }))
+      );
     } catch (err) {
       setError('Tidak bisa terhubung ke server');
     } finally {
@@ -70,6 +83,32 @@ function Laporan({ token }) {
               <div className="stat-label">Jumlah Transaksi</div>
               <div className="stat-value">{data.jumlah_transaksi}</div>
             </div>
+          </div>
+
+          <div className="card">
+            <h3 className="card-title">Tren Penjualan Harian</h3>
+            {grafikData.length === 0 ? (
+              <div className="empty-state">Belum ada data penjualan di periode ini.</div>
+            ) : (
+              <div style={{ width: '100%', height: 260 }}>
+                <ResponsiveContainer>
+                  <LineChart data={grafikData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                    <CartesianGrid stroke="#E3E6EA" vertical={false} />
+                    <XAxis dataKey="tanggal" tick={{ fontSize: 12, fill: '#6B7280' }} axisLine={{ stroke: '#E3E6EA' }} />
+                    <YAxis
+                      tick={{ fontSize: 12, fill: '#6B7280' }}
+                      axisLine={{ stroke: '#E3E6EA' }}
+                      tickFormatter={(v) => `${(v / 1000).toLocaleString('id-ID')}rb`}
+                    />
+                    <Tooltip
+                      formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Omset']}
+                      contentStyle={{ borderRadius: 8, border: '1px solid #E3E6EA', fontSize: '0.8rem' }}
+                    />
+                    <Line type="monotone" dataKey="total" stroke="#0F766E" strokeWidth={2.5} dot={{ r: 3 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </div>
 
           <div className="card">
