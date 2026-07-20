@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { API_URL } from './api';
 
 function Laporan({ token }) {
@@ -49,11 +52,73 @@ function Laporan({ token }) {
     muatLaporan();
   }, []);
 
+  const namaFile = () => {
+    const hariIni = new Date().toISOString().slice(0, 10);
+    return `laporan-penjualan-${hariIni}`;
+  };
+
+  const exportExcel = () => {
+    if (!data) return;
+
+    const wsData = [
+      ['Laporan Penjualan'],
+      ['Periode', `${dari || 'Awal'} s/d ${sampai || 'Sekarang'}`],
+      [],
+      ['Total Omset', Number(data.total_omset)],
+      ['Jumlah Transaksi', data.jumlah_transaksi],
+      [],
+      ['Produk Terlaris'],
+      ['Nama Produk', 'Jumlah Terjual', 'Total Omset Produk'],
+      ...data.produk_terlaris.map((p) => [p.nama, p.total_terjual, Number(p.total_omset_produk)]),
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols'] = [{ wch: 28 }, { wch: 18 }, { wch: 20 }];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Laporan');
+    XLSX.writeFile(wb, `${namaFile()}.xlsx`);
+  };
+
+  const exportPDF = () => {
+    if (!data) return;
+
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text('Laporan Penjualan', 14, 18);
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Periode: ${dari || 'Awal'} s/d ${sampai || 'Sekarang'}`, 14, 25);
+    doc.setTextColor(0);
+    doc.text(`Total Omset: Rp ${Number(data.total_omset).toLocaleString('id-ID')}`, 14, 34);
+    doc.text(`Jumlah Transaksi: ${data.jumlah_transaksi}`, 14, 40);
+
+    autoTable(doc, {
+      startY: 48,
+      head: [['Produk', 'Jumlah Terjual', 'Total Omset Produk']],
+      body: data.produk_terlaris.map((p) => [
+        p.nama,
+        p.total_terjual,
+        `Rp ${Number(p.total_omset_produk).toLocaleString('id-ID')}`,
+      ]),
+      headStyles: { fillColor: [15, 118, 110] },
+      styles: { fontSize: 9 },
+    });
+
+    doc.save(`${namaFile()}.pdf`);
+  };
+
   return (
     <div>
       <div className="card">
         <div className="page-header">
           <h2 className="page-title">Laporan Penjualan</h2>
+          {data && (
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button className="btn btn-secondary btn-sm" onClick={exportExcel}>📊 Export Excel</button>
+              <button className="btn btn-secondary btn-sm" onClick={exportPDF}>📄 Export PDF</button>
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div className="form-group" style={{ marginBottom: 0 }}>
