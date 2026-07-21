@@ -13,6 +13,7 @@ import KelolaSupplier from './KelolaSupplier';
 import Restock from './Restock';
 import { API_URL } from './api';
 import { JENIS_PRODUK_PAKAIAN, TARGET_USIA_PAKAIAN, SEGMEN_PAKAIAN } from './kategoriPakaian';
+import BarcodeLabel from './BarcodeLabel';
 
 const MENU = [
   { key: 'produk', label: 'Daftar Produk', icon: '📦', roles: ['owner', 'admin', 'kasir'] },
@@ -64,6 +65,7 @@ function App() {
   const [formVarianBaru, setFormVarianBaru] = useState(varianBaruKosong());
   const [savingVarianBaru, setSavingVarianBaru] = useState(false);
   const [pesanVarianBaru, setPesanVarianBaru] = useState(null);
+  const [barcodeDipilih, setBarcodeDipilih] = useState(null);
 
   const [filterJenis, setFilterJenis] = useState('');
   const [filterUsia, setFilterUsia] = useState('');
@@ -360,12 +362,20 @@ function App() {
                             {(user?.role === 'owner' || user?.role === 'admin') && (
                               <td>
                                 {punyaVarian ? (
-                                  <button className="btn btn-secondary btn-sm" onClick={() => bukaKelolaVarian(p)}>
-                                    {produkDiperluas === p.id ? 'Tutup' : 'Kelola Varian'}
-                                  </button>
-                                ) : (
-                                  <button className="btn btn-secondary btn-sm" onClick={() => { setProdukDiedit(p); setHalaman('tambah'); }}>Edit</button>
-                                )}{' '}
+                                    <button className="btn btn-secondary btn-sm" onClick={() => bukaKelolaVarian(p)}>
+                                      {produkDiperluas === p.id ? 'Tutup' : 'Kelola Varian'}
+                                    </button>
+                                  ) : (
+                                    <>
+                                      <button className="btn btn-secondary btn-sm" onClick={() => { setProdukDiedit(p); setHalaman('tambah'); }}>Edit</button>{' '}
+                                      <button
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={() => setBarcodeDipilih({ kode: p.sku, judul: p.nama, subJudul: `Rp ${Number(p.harga).toLocaleString('id-ID')}` })}
+                                      >
+                                        🏷️
+                                      </button>
+                                    </>
+                                  )}{' '}
                                 <button className="btn btn-danger btn-sm" onClick={() => hapusProduk(p.id)}>Hapus</button>
                               </td>
                             )}
@@ -408,13 +418,23 @@ function App() {
                                             </td>
                                             <td>
                                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <button
-                                                  className="btn btn-primary btn-sm"
-                                                  disabled={sedangSimpan}
-                                                  onClick={() => simpanVarian(p, v)}
-                                                >
-                                                  {sedangSimpan ? 'Menyimpan...' : 'Simpan'}
-                                                </button>
+                                              <button
+                                                className="btn btn-secondary btn-sm"
+                                                onClick={() => setBarcodeDipilih({
+                                                  kode: v.sku,
+                                                  judul: p.nama,
+                                                  subJudul: `${[v.ukuran, v.warna].filter(Boolean).join('/')} · Rp ${Number(v.harga ?? p.harga).toLocaleString('id-ID')}`,
+                                                })}
+                                              >
+                                                🏷️
+                                              </button>
+                                              <button
+                                                className="btn btn-primary btn-sm"
+                                                disabled={sedangSimpan}
+                                                onClick={() => simpanVarian(p, v)}
+                                              >
+                                                {sedangSimpan ? 'Menyimpan...' : 'Simpan'}
+                                              </button>
                                                 {pesan && (
                                                   <span style={{ fontSize: '0.78rem', color: pesan.tipe === 'sukses' ? 'var(--color-success)' : 'var(--color-danger)' }}>
                                                     {pesan.tipe === 'sukses' ? '✓ ' : '✕ '}{pesan.teks}
@@ -529,6 +549,14 @@ function App() {
           {halaman === 'pelanggan' && <Pelanggan token={token} />}
         </main>
       </div>
+      {barcodeDipilih && (
+        <BarcodeLabel
+          kode={barcodeDipilih.kode}
+          judul={barcodeDipilih.judul}
+          subJudul={barcodeDipilih.subJudul}
+          onTutup={() => setBarcodeDipilih(null)}
+        />
+      )}
     </div>
   );
 }

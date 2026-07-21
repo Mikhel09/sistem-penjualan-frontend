@@ -1,6 +1,14 @@
 import { useState, useEffect } from 'react';
+import { Html5QrcodeScanner } from 'html5-qrcode';
+import { QRCodeSVG } from 'qrcode.react';
 import { API_URL } from './api';
 import { JENIS_PRODUK_PAKAIAN, TARGET_USIA_PAKAIAN } from './kategoriPakaian';
+
+const METODE_BAYAR = [
+  { key: 'tunai', label: 'Tunai', icon: '💵' },
+  { key: 'kartu', label: 'Kartu', icon: '💳' },
+  { key: 'qris', label: 'QRIS', icon: '📱' },
+];
 
 function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
   const [cabangList, setCabangList] = useState([]);
@@ -10,9 +18,11 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
   const [message, setMessage] = useState('');
   const [noMeja, setNoMeja] = useState('');
   const [catatan, setCatatan] = useState('');
-  const [kodeBarcode, setKodeBarcode] = useState('');
+  const [kodeCari, setKodeCari] = useState('');
+  const [scannerAktif, setScannerAktif] = useState(false);
   const [strukData, setStrukData] = useState(null);
   const [metodeBayar, setMetodeBayar] = useState('tunai');
+  const [showQRPayment, setShowQRPayment] = useState(false);
   const [teleponCari, setTeleponCari] = useState('');
   const [pelangganDipilih, setPelangganDipilih] = useState(null);
   const [pesanPelanggan, setPesanPelanggan] = useState('');
@@ -30,13 +40,38 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
     }
   }, []);
 
-  useEffect(() => {
+  const muatProdukKasir = () => {
     if (!storeIdAktif) return;
     const url = storeIdUser ? `${API_URL}/api/products` : `${API_URL}/api/products?store_id=${storeIdAktif}`;
     fetch(url, { headers: { Authorization: `Bearer ${token}` } })
       .then((res) => res.json())
       .then(setProducts);
+  };
+
+  useEffect(() => {
+    muatProdukKasir();
   }, [storeIdAktif]);
+
+  // Kamera scan (barcode/QR) — aktif hanya waktu tombol "Pindai" diklik
+  useEffect(() => {
+    if (!scannerAktif) return;
+
+    const scanner = new Html5QrcodeScanner('scanner-box', { fps: 10, qrbox: 200 }, false);
+    scanner.render(
+      (decodedText) => {
+        setKodeCari(decodedText);
+        scanner.clear().catch(() => {});
+        setScannerAktif(false);
+        cariProdukByKode(decodedText);
+      },
+      () => {} // abaikan kalau belum ketemu di frame ini, itu wajar
+    );
+
+    return () => {
+      scanner.clear().catch(() => {});
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scannerAktif]);
 
   const productsTampil = products.filter((p) => {
     if (jenisUsaha !== 'pakaian') return true;
@@ -46,8 +81,6 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
     return true;
   });
 
-  // Kunci unik tiap baris keranjang: produk tanpa varian pakai product_id saja,
-  // produk dengan varian pakai kombinasi product_id + variant_id (karena 1 produk bisa ada banyak varian di keranjang)
   const kunciCart = (productId, variantId) => `${productId}-${variantId || 'x'}`;
 
   const tambahKeKeranjang = (produk, varian) => {
@@ -77,27 +110,38 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
 
       return [
         ...prev,
-        {
-          product_id: produk.id,
-          variant_id: varian ? varian.id : null,
-          nama: namaTampil,
-          harga: hargaDipakai,
-          qty: 1,
-        },
+        { product_id: produk.id, variant_id: varian ? varian.id : null, nama: namaTampil, harga: hargaDipakai, qty: 1 },
       ];
     });
   };
 
-  const cariByBarcode = (e) => {
-    e.preventDefault();
-    const produk = products.find((p) => p.attributes?.barcode === kodeBarcode);
-    if (produk) {
-      tambahKeKeranjang(produk, null);
-      setMessage('');
-    } else {
-      setMessage('Barcode tidak ditemukan');
+  const cariProdukByKode = async (kode) => {
+    if (!kode) return;
+    setMessage('');
+    try {
+      const res = await fetch(`${API_URL}/api/products/cari-kode?kode=${encodeURIComponent(kode)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMessage(data.error || 'Produk tidak ditemukan');
+        return;
+      }
+      if (data.tipe === 'varian') {
+        const v = data.data;
+        tambahKeKeranjang({ id: v.product_id, nama: v.nama, harga: v.harga_produk }, v);
+      } else {
+        tambahKeKeranjang(data.data, null);
+      }
+    } catch (err) {
+      setMessage('Tidak bisa terhubung ke server');
     }
-    setKodeBarcode('');
+  };
+
+  const submitCariKode = (e) => {
+    e.preventDefault();
+    cariProdukByKode(kodeCari);
+    setKodeCari('');
   };
 
   const cariPelanggan = async (e) => {
@@ -121,7 +165,7 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
 
   const totalKeranjang = cart.reduce((sum, item) => sum + item.harga * item.qty, 0);
 
-  const bayar = async () => {
+  const prosesBayar = async () => {
     setMessage('');
     try {
       const res = await fetch(`${API_URL}/api/transactions`, {
@@ -157,14 +201,18 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
       setCatatan('');
       setPelangganDipilih(null);
       setTeleponCari('');
-
-      // Refresh daftar produk supaya stok varian yang baru terjual ikut ter-update
-      const url = storeIdUser ? `${API_URL}/api/products` : `${API_URL}/api/products?store_id=${storeIdAktif}`;
-      fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-        .then((r) => r.json())
-        .then(setProducts);
+      muatProdukKasir();
     } catch (err) {
       setMessage('Tidak bisa terhubung ke server');
+    }
+  };
+
+  const klikBayar = () => {
+    if (cart.length === 0) return;
+    if (metodeBayar === 'qris') {
+      setShowQRPayment(true);
+    } else {
+      prosesBayar();
     }
   };
 
@@ -229,18 +277,24 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
       <div className="pos-catalog card">
         <h2 className="card-title">Pilih Produk</h2>
 
-        {jenisUsaha === 'supermarket' && (
-          <form onSubmit={cariByBarcode} style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
-            <input
-              className="input"
-              placeholder="Scan/ketik barcode lalu Enter"
-              value={kodeBarcode}
-              onChange={(e) => setKodeBarcode(e.target.value)}
-              autoFocus
-            />
-            <button className="btn btn-secondary" type="submit">Cari</button>
-          </form>
-        )}
+        <form onSubmit={submitCariKode} style={{ marginBottom: '0.75rem', display: 'flex', gap: '0.5rem' }}>
+          <input
+            className="input"
+            placeholder="Ketik atau scan kode produk"
+            value={kodeCari}
+            onChange={(e) => setKodeCari(e.target.value)}
+          />
+          <button className="btn btn-secondary" type="submit">Cari</button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => setScannerAktif((s) => !s)}
+          >
+            {scannerAktif ? 'Tutup Kamera' : '📷 Pindai'}
+          </button>
+        </form>
+
+        {scannerAktif && <div id="scanner-box" className="scanner-box"></div>}
 
         {jenisUsaha === 'pakaian' && (
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
@@ -335,11 +389,19 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
 
         <div className="form-group">
           <label className="form-label">Metode Bayar</label>
-          <select className="input" value={metodeBayar} onChange={(e) => setMetodeBayar(e.target.value)}>
-            <option value="tunai">Tunai</option>
-            <option value="kartu">Kartu</option>
-            <option value="qris">QRIS</option>
-          </select>
+          <div className="payment-options">
+            {METODE_BAYAR.map((m) => (
+              <button
+                key={m.key}
+                type="button"
+                className={`payment-option ${metodeBayar === m.key ? 'selected' : ''}`}
+                onClick={() => setMetodeBayar(m.key)}
+              >
+                <span className="icon">{m.icon}</span>
+                {m.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {cart.length === 0 ? (
@@ -356,13 +418,36 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
               <span>Total</span>
               <span>Rp {totalKeranjang.toLocaleString('id-ID')}</span>
             </div>
-            <button className="btn btn-primary btn-block" style={{ marginTop: '1rem' }} onClick={bayar}>
+            <button className="btn btn-primary btn-block" style={{ marginTop: '1rem' }} onClick={klikBayar}>
               Bayar
             </button>
           </>
         )}
         {message && <div className="alert alert-error" style={{ marginTop: '1rem' }}>{message}</div>}
       </div>
+
+      {showQRPayment && (
+        <div className="modal-overlay">
+          <div className="modal-card" style={{ textAlign: 'center' }}>
+            <h3 style={{ marginTop: 0 }}>Scan untuk Bayar</h3>
+            <div style={{ display: 'flex', justifyContent: 'center', margin: '1rem 0' }}>
+              <QRCodeSVG value={`QRIS-DEMO|${namaBisnis}|Rp${totalKeranjang}|${Date.now()}`} size={200} />
+            </div>
+            <p style={{ fontWeight: 700, fontSize: '1.2rem', fontFamily: 'var(--font-mono)' }}>
+              Rp {totalKeranjang.toLocaleString('id-ID')}
+            </p>
+            <p style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
+              ⚠️ QR simulasi lokal, bukan QRIS resmi. Untuk QRIS sungguhan perlu integrasi penyedia resmi (Midtrans/Xendit/dll).
+            </p>
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+              <button className="btn btn-primary btn-block" onClick={() => { setShowQRPayment(false); prosesBayar(); }}>
+                Pembayaran Diterima
+              </button>
+              <button className="btn btn-secondary" onClick={() => setShowQRPayment(false)}>Batal</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
