@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import Login from './Login';
 import LupaPassword from './LupaPassword';
 import ResetPassword from './ResetPassword';
@@ -53,8 +53,10 @@ function App() {
   const [halaman, setHalaman] = useState('produk');
   const [produkDiedit, setProdukDiedit] = useState(null);
   const [tampilanAuth, setTampilanAuth] = useState('login');
-  const [produkDiperluas, setProdukDiperluas] = useState(null); // id produk yang sedang buka panel varian
-  const [editVarianValues, setEditVarianValues] = useState({}); // { [variantId]: { stok, harga } }
+  const [produkDiperluas, setProdukDiperluas] = useState(null);
+  const [editVarianValues, setEditVarianValues] = useState({});
+  const [savingVariantId, setSavingVariantId] = useState(null);
+  const [variantMessage, setVariantMessage] = useState({}); // { [variantId]: { tipe: 'sukses'|'error', teks } }
 
   const [filterJenis, setFilterJenis] = useState('');
   const [filterUsia, setFilterUsia] = useState('');
@@ -114,17 +116,24 @@ function App() {
     setProdukDiperluas(produk.id);
     const initial = {};
     for (const v of produk.variants) {
-      initial[v.id] = { stok: v.stok, harga: v.harga ?? '' };
+      initial[v.id] = { stok: String(v.stok), harga: v.harga != null ? String(v.harga) : '' };
     }
     setEditVarianValues(initial);
+    setVariantMessage({});
   };
 
   const ubahNilaiVarian = (variantId, field, value) => {
-    setEditVarianValues((prev) => ({ ...prev, [variantId]: { ...prev[variantId], [field]: value } }));
+    setEditVarianValues((prev) => ({
+      ...prev,
+      [variantId]: { ...prev[variantId], [field]: value },
+    }));
   };
 
   const simpanVarian = async (produk, variant) => {
     const nilai = editVarianValues[variant.id];
+    setSavingVariantId(variant.id);
+    setVariantMessage((prev) => ({ ...prev, [variant.id]: null }));
+
     try {
       const res = await fetch(`${API_URL}/api/products/${produk.id}/variants/${variant.id}`, {
         method: 'PUT',
@@ -133,18 +142,27 @@ function App() {
           ukuran: variant.ukuran,
           warna: variant.warna,
           stok: Number(nilai.stok),
-          harga: nilai.harga ? Number(nilai.harga) : null,
+          harga: nilai.harga && nilai.harga.trim() !== '' ? Number(nilai.harga) : null,
         }),
       });
       const data = await res.json();
+
       if (!res.ok) {
-        alert(data.error || 'Gagal menyimpan varian');
+        setVariantMessage((prev) => ({ ...prev, [variant.id]: { tipe: 'error', teks: data.error || 'Gagal menyimpan' } }));
         return;
       }
+
+      setVariantMessage((prev) => ({ ...prev, [variant.id]: { tipe: 'sukses', teks: 'Tersimpan!' } }));
       muatProduk();
       muatProdukMenipis();
+
+      setTimeout(() => {
+        setVariantMessage((prev) => ({ ...prev, [variant.id]: null }));
+      }, 3000);
     } catch (err) {
-      alert('Tidak bisa terhubung ke server');
+      setVariantMessage((prev) => ({ ...prev, [variant.id]: { tipe: 'error', teks: 'Tidak bisa terhubung ke server' } }));
+    } finally {
+      setSavingVariantId(null);
     }
   };
 
@@ -286,8 +304,8 @@ function App() {
                     {productsTampil.map((p) => {
                       const punyaVarian = p.variants && p.variants.length > 0;
                       return (
-                        <>
-                          <tr key={p.id}>
+                        <Fragment key={p.id}>
+                          <tr>
                             <td>{p.nama}</td>
                             <td className="num">{tampilanHargaProduk(p)}</td>
                             <td className="num">{totalStokProduk(p)}</td>
@@ -315,44 +333,61 @@ function App() {
                                   <strong style={{ fontSize: '0.8rem' }}>Varian Produk</strong>
                                   <table className="data-table" style={{ marginTop: '0.5rem' }}>
                                     <thead>
-                                      <tr><th>Ukuran</th><th>Warna</th><th>Stok</th><th>Harga (kosongkan = ikut harga dasar)</th><th></th></tr>
+                                      <tr><th>Ukuran</th><th>Warna</th><th>Stok</th><th>Harga (kosongkan = ikut harga dasar)</th><th style={{ minWidth: '160px' }}></th></tr>
                                     </thead>
                                     <tbody>
-                                      {p.variants.map((v) => (
-                                        <tr key={v.id}>
-                                          <td>{v.ukuran || '-'}</td>
-                                          <td>{v.warna || '-'}</td>
-                                          <td>
-                                            <input
-                                              className="input"
-                                              type="number"
-                                              style={{ width: '80px' }}
-                                              value={editVarianValues[v.id]?.stok ?? v.stok}
-                                              onChange={(e) => ubahNilaiVarian(v.id, 'stok', e.target.value)}
-                                            />
-                                          </td>
-                                          <td>
-                                            <input
-                                              className="input"
-                                              type="number"
-                                              style={{ width: '100px' }}
-                                              placeholder={`Rp ${Number(p.harga).toLocaleString('id-ID')}`}
-                                              value={editVarianValues[v.id]?.harga ?? ''}
-                                              onChange={(e) => ubahNilaiVarian(v.id, 'harga', e.target.value)}
-                                            />
-                                          </td>
-                                          <td>
-                                            <button className="btn btn-primary btn-sm" onClick={() => simpanVarian(p, v)}>Simpan</button>
-                                          </td>
-                                        </tr>
-                                      ))}
+                                      {p.variants.map((v) => {
+                                        const pesan = variantMessage[v.id];
+                                        const sedangSimpan = savingVariantId === v.id;
+                                        return (
+                                          <tr key={v.id}>
+                                            <td>{v.ukuran || '-'}</td>
+                                            <td>{v.warna || '-'}</td>
+                                            <td>
+                                              <input
+                                                className="input"
+                                                type="number"
+                                                style={{ width: '80px' }}
+                                                value={editVarianValues[v.id]?.stok ?? ''}
+                                                onChange={(e) => ubahNilaiVarian(v.id, 'stok', e.target.value)}
+                                              />
+                                            </td>
+                                            <td>
+                                              <input
+                                                className="input"
+                                                type="number"
+                                                style={{ width: '100px' }}
+                                                placeholder={`Rp ${Number(p.harga).toLocaleString('id-ID')}`}
+                                                value={editVarianValues[v.id]?.harga ?? ''}
+                                                onChange={(e) => ubahNilaiVarian(v.id, 'harga', e.target.value)}
+                                              />
+                                            </td>
+                                            <td>
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <button
+                                                  className="btn btn-primary btn-sm"
+                                                  disabled={sedangSimpan}
+                                                  onClick={() => simpanVarian(p, v)}
+                                                >
+                                                  {sedangSimpan ? 'Menyimpan...' : 'Simpan'}
+                                                </button>
+                                                {pesan && (
+                                                  <span style={{ fontSize: '0.78rem', color: pesan.tipe === 'sukses' ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                                                    {pesan.tipe === 'sukses' ? '✓ ' : '✕ '}{pesan.teks}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
                                     </tbody>
                                   </table>
                                 </div>
                               </td>
                             </tr>
                           )}
-                        </>
+                        </Fragment>
                       );
                     })}
                   </tbody>
