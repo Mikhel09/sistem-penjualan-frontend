@@ -16,11 +16,11 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
   const [teleponCari, setTeleponCari] = useState('');
   const [pelangganDipilih, setPelangganDipilih] = useState(null);
   const [pesanPelanggan, setPesanPelanggan] = useState('');
+  const [filterJenis, setFilterJenis] = useState('');
+  const [filterUsia, setFilterUsia] = useState('');
 
   const butuhPilihCabang = !storeIdUser;
   const storeIdAktif = storeIdUser || storeIdDipilih;
-  const [filterJenis, setFilterJenis] = useState('');
-  const [filterUsia, setFilterUsia] = useState('');
 
   useEffect(() => {
     if (butuhPilihCabang) {
@@ -38,15 +38,53 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
       .then(setProducts);
   }, [storeIdAktif]);
 
-  const tambahKeKeranjang = (produk) => {
+  const productsTampil = products.filter((p) => {
+    if (jenisUsaha !== 'pakaian') return true;
+    const attrs = p.attributes || {};
+    if (filterJenis && attrs.jenis_pakaian !== filterJenis) return false;
+    if (filterUsia && attrs.target_usia !== filterUsia) return false;
+    return true;
+  });
+
+  // Kunci unik tiap baris keranjang: produk tanpa varian pakai product_id saja,
+  // produk dengan varian pakai kombinasi product_id + variant_id (karena 1 produk bisa ada banyak varian di keranjang)
+  const kunciCart = (productId, variantId) => `${productId}-${variantId || 'x'}`;
+
+  const tambahKeKeranjang = (produk, varian) => {
+    const stokTersedia = varian ? varian.stok : produk.stok;
+    const key = kunciCart(produk.id, varian?.id);
+
     setCart((prev) => {
-      const sudahAda = prev.find((item) => item.product_id === produk.id);
+      const sudahAda = prev.find((item) => kunciCart(item.product_id, item.variant_id) === key);
+      const qtyDiKeranjang = sudahAda ? sudahAda.qty : 0;
+
+      if (qtyDiKeranjang + 1 > stokTersedia) {
+        setMessage('Stok tidak cukup');
+        return prev;
+      }
+      setMessage('');
+
       if (sudahAda) {
         return prev.map((item) =>
-          item.product_id === produk.id ? { ...item, qty: item.qty + 1 } : item
+          kunciCart(item.product_id, item.variant_id) === key ? { ...item, qty: item.qty + 1 } : item
         );
       }
-      return [...prev, { product_id: produk.id, nama: produk.nama, harga: produk.harga, qty: 1 }];
+
+      const namaTampil = varian
+        ? `${produk.nama} (${[varian.ukuran, varian.warna].filter(Boolean).join('/')})`
+        : produk.nama;
+      const hargaDipakai = varian ? Number(varian.harga ?? produk.harga) : Number(produk.harga);
+
+      return [
+        ...prev,
+        {
+          product_id: produk.id,
+          variant_id: varian ? varian.id : null,
+          nama: namaTampil,
+          harga: hargaDipakai,
+          qty: 1,
+        },
+      ];
     });
   };
 
@@ -54,7 +92,7 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
     e.preventDefault();
     const produk = products.find((p) => p.attributes?.barcode === kodeBarcode);
     if (produk) {
-      tambahKeKeranjang(produk);
+      tambahKeKeranjang(produk, null);
       setMessage('');
     } else {
       setMessage('Barcode tidak ditemukan');
@@ -90,7 +128,11 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          items: cart.map((item) => ({ product_id: item.product_id, qty: item.qty })),
+          items: cart.map((item) => ({
+            product_id: item.product_id,
+            variant_id: item.variant_id || undefined,
+            qty: item.qty,
+          })),
           no_meja: jenisUsaha === 'makanan_minuman' ? noMeja : undefined,
           catatan: jenisUsaha === 'makanan_minuman' ? catatan : undefined,
           store_id: Number(storeIdAktif),
@@ -115,6 +157,12 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
       setCatatan('');
       setPelangganDipilih(null);
       setTeleponCari('');
+
+      // Refresh daftar produk supaya stok varian yang baru terjual ikut ter-update
+      const url = storeIdUser ? `${API_URL}/api/products` : `${API_URL}/api/products?store_id=${storeIdAktif}`;
+      fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.json())
+        .then(setProducts);
     } catch (err) {
       setMessage('Tidak bisa terhubung ke server');
     }
@@ -150,7 +198,10 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
           <hr />
           {strukData.items.map((item) => (
             <div key={item.id} className="receipt-line">
-              <span>{item.nama_produk} x{item.qty}</span>
+              <span>
+                {item.nama_produk}
+                {(item.ukuran || item.warna) && ` (${[item.ukuran, item.warna].filter(Boolean).join('/')})`} x{item.qty}
+              </span>
               <span>Rp {(item.qty * item.harga_saat_jual).toLocaleString('id-ID')}</span>
             </div>
           ))}
@@ -173,18 +224,23 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
     );
   }
 
-  const productsTampil = products.filter((p) => {
-  if (jenisUsaha !== 'pakaian') return true;
-  const attrs = p.attributes || {};
-  if (filterJenis && attrs.jenis_pakaian !== filterJenis) return false;
-  if (filterUsia && attrs.target_usia !== filterUsia) return false;
-  return true;
-});
-
   return (
     <div className="pos-layout">
       <div className="pos-catalog card">
         <h2 className="card-title">Pilih Produk</h2>
+
+        {jenisUsaha === 'supermarket' && (
+          <form onSubmit={cariByBarcode} style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
+            <input
+              className="input"
+              placeholder="Scan/ketik barcode lalu Enter"
+              value={kodeBarcode}
+              onChange={(e) => setKodeBarcode(e.target.value)}
+              autoFocus
+            />
+            <button className="btn btn-secondary" type="submit">Cari</button>
+          </form>
+        )}
 
         {jenisUsaha === 'pakaian' && (
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
@@ -203,26 +259,44 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
           </div>
         )}
 
-        {jenisUsaha === 'supermarket' && (
-          <form onSubmit={cariByBarcode} style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
-            <input
-              className="input"
-              placeholder="Scan/ketik barcode lalu Enter"
-              value={kodeBarcode}
-              onChange={(e) => setKodeBarcode(e.target.value)}
-              autoFocus
-            />
-            <button className="btn btn-secondary" type="submit">Cari</button>
-          </form>
-        )}
+        {productsTampil.map((p) => {
+          const punyaVarian = p.variants && p.variants.length > 0;
 
-        {productsTampil.map((p) => (
-          <button key={p.id} className="product-btn" onClick={() => tambahKeKeranjang(p)}>
-            <span>{p.nama} <span style={{ color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>(stok: {p.stok})</span></span>
-            <span className="price">Rp {Number(p.harga).toLocaleString('id-ID')}</span>
-          </button>
-        ))}
-        {products.length === 0 && <div className="empty-state">Belum ada produk di cabang ini.</div>}
+          if (!punyaVarian) {
+            return (
+              <button key={p.id} className="product-btn" onClick={() => tambahKeKeranjang(p, null)} disabled={p.stok <= 0}>
+                <span>{p.nama} <span style={{ color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>(stok: {p.stok})</span></span>
+                <span className="price">Rp {Number(p.harga).toLocaleString('id-ID')}</span>
+              </button>
+            );
+          }
+
+          return (
+            <div key={p.id} style={{ marginBottom: '10px' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>{p.nama}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {p.variants.map((v) => {
+                  const habis = v.stok <= 0;
+                  const hargaVarian = Number(v.harga ?? p.harga);
+                  const label = [v.ukuran, v.warna].filter(Boolean).join(' / ') || 'Default';
+                  return (
+                    <button
+                      key={v.id}
+                      className="btn btn-secondary btn-sm"
+                      style={{ opacity: habis ? 0.4 : 1 }}
+                      disabled={habis}
+                      onClick={() => tambahKeKeranjang(p, v)}
+                      title={habis ? 'Stok habis' : ''}
+                    >
+                      {label} · stok {v.stok} · Rp {hargaVarian.toLocaleString('id-ID')}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+        {productsTampil.length === 0 && <div className="empty-state">Belum ada produk di cabang ini.</div>}
       </div>
 
       <div className="pos-cart card">
@@ -273,7 +347,7 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
         ) : (
           <>
             {cart.map((item) => (
-              <div key={item.product_id} className="cart-line">
+              <div key={kunciCart(item.product_id, item.variant_id)} className="cart-line">
                 <span>{item.nama} x{item.qty}</span>
                 <span>Rp {(item.harga * item.qty).toLocaleString('id-ID')}</span>
               </div>
