@@ -3,16 +3,39 @@ import { API_URL } from './api';
 
 const FIELD_PER_KATEGORI = {
   pakaian: [
-    { key: 'ukuran', label: 'Ukuran', placeholder: 'S / M / L / XL' },
-    { key: 'warna', label: 'Warna', placeholder: 'Hitam, Merah, dst' },
+    {
+      key: 'jenis_pakaian',
+      label: 'Jenis Produk',
+      type: 'select',
+      options: [
+        'Atasan', 'Bawahan', 'Dress/Terusan', 'Outerwear (Jaket/Sweater)',
+        'Pakaian Dalam', 'Piyama/Pakaian Tidur', 'Setelan',
+        'Aksesoris', 'Tas', 'Alas Kaki', 'Seragam',
+      ],
+    },
+    {
+      key: 'target_usia',
+      label: 'Target Usia',
+      type: 'select',
+      options: ['Dewasa', 'Remaja', 'Anak-anak', 'Bayi/Balita'],
+    },
+    {
+      key: 'jenis_kelamin',
+      label: 'Segmen',
+      type: 'select',
+      options: ['Pria', 'Wanita', 'Unisex'],
+    },
+    { key: 'ukuran', label: 'Ukuran', type: 'text', placeholder: 'S / M / L / 38 / 27, dst' },
+    { key: 'warna', label: 'Warna', type: 'text', placeholder: 'Hitam, Merah, dst' },
+    { key: 'bahan', label: 'Bahan (opsional)', type: 'text', placeholder: 'Katun, Denim, Polyester, dst' },
   ],
   makanan_minuman: [
-    { key: 'kategori_menu', label: 'Kategori Menu', placeholder: 'Makanan / Minuman' },
-    { key: 'level_pedas', label: 'Level Pedas (0-5)', placeholder: '0' },
+    { key: 'kategori_menu', label: 'Kategori Menu', type: 'text', placeholder: 'Makanan / Minuman' },
+    { key: 'level_pedas', label: 'Level Pedas (0-5)', type: 'text', placeholder: '0' },
   ],
   supermarket: [
-    { key: 'berat', label: 'Berat/Kemasan', placeholder: '500g, 1L, dst' },
-    { key: 'barcode', label: 'Barcode', placeholder: '899...' },
+    { key: 'berat', label: 'Berat/Kemasan', type: 'text', placeholder: '500g, 1L, dst' },
+    { key: 'barcode', label: 'Barcode', type: 'text', placeholder: '899...' },
   ],
 };
 
@@ -140,12 +163,25 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
         {fieldsKategori.map((field) => (
           <div key={field.key} className="form-group">
             <label className="form-label">{field.label}</label>
-            <input
-              className="input"
-              placeholder={field.placeholder}
-              value={attrValues[field.key] || ''}
-              onChange={(e) => handleAttrChange(field.key, e.target.value)}
-            />
+            {field.type === 'select' ? (
+              <select
+                className="input"
+                value={attrValues[field.key] || ''}
+                onChange={(e) => handleAttrChange(field.key, e.target.value)}
+              >
+                <option value="">-- Pilih --</option>
+                {field.options.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                className="input"
+                placeholder={field.placeholder}
+                value={attrValues[field.key] || ''}
+                onChange={(e) => handleAttrChange(field.key, e.target.value)}
+              />
+            )}
           </div>
         ))}
 
