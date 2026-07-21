@@ -27,6 +27,24 @@ const MENU = [
   { key: 'cabang', label: 'Kelola Cabang', icon: '🏬', roles: ['owner'] },
 ];
 
+function totalStokProduk(p) {
+  if (p.variants && p.variants.length > 0) {
+    return p.variants.reduce((sum, v) => sum + v.stok, 0);
+  }
+  return p.stok;
+}
+
+function tampilanHargaProduk(p) {
+  if (p.variants && p.variants.length > 0) {
+    const hargaList = p.variants.map((v) => Number(v.harga ?? p.harga));
+    const min = Math.min(...hargaList);
+    const max = Math.max(...hargaList);
+    if (min === max) return `Rp ${min.toLocaleString('id-ID')}`;
+    return `Rp ${min.toLocaleString('id-ID')} - Rp ${max.toLocaleString('id-ID')}`;
+  }
+  return `Rp ${Number(p.harga).toLocaleString('id-ID')}`;
+}
+
 function App() {
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
@@ -35,6 +53,8 @@ function App() {
   const [halaman, setHalaman] = useState('produk');
   const [produkDiedit, setProdukDiedit] = useState(null);
   const [tampilanAuth, setTampilanAuth] = useState('login');
+  const [produkDiperluas, setProdukDiperluas] = useState(null); // id produk yang sedang buka panel varian
+  const [editVarianValues, setEditVarianValues] = useState({}); // { [variantId]: { stok, harga } }
 
   const [filterJenis, setFilterJenis] = useState('');
   const [filterUsia, setFilterUsia] = useState('');
@@ -86,6 +106,48 @@ function App() {
     }
   };
 
+  const bukaKelolaVarian = (produk) => {
+    if (produkDiperluas === produk.id) {
+      setProdukDiperluas(null);
+      return;
+    }
+    setProdukDiperluas(produk.id);
+    const initial = {};
+    for (const v of produk.variants) {
+      initial[v.id] = { stok: v.stok, harga: v.harga ?? '' };
+    }
+    setEditVarianValues(initial);
+  };
+
+  const ubahNilaiVarian = (variantId, field, value) => {
+    setEditVarianValues((prev) => ({ ...prev, [variantId]: { ...prev[variantId], [field]: value } }));
+  };
+
+  const simpanVarian = async (produk, variant) => {
+    const nilai = editVarianValues[variant.id];
+    try {
+      const res = await fetch(`${API_URL}/api/products/${produk.id}/variants/${variant.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          ukuran: variant.ukuran,
+          warna: variant.warna,
+          stok: Number(nilai.stok),
+          harga: nilai.harga ? Number(nilai.harga) : null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Gagal menyimpan varian');
+        return;
+      }
+      muatProduk();
+      muatProdukMenipis();
+    } catch (err) {
+      alert('Tidak bisa terhubung ke server');
+    }
+  };
+
   useEffect(() => {
     if (token) {
       muatProduk();
@@ -107,7 +169,6 @@ function App() {
   const menuUntukRole = MENU.filter((m) => m.roles.includes(user?.role));
   const isPakaian = user?.jenis_usaha === 'pakaian';
 
-  // Filter produk (khusus kategori pakaian) — dikerjakan di frontend karena datanya sudah dimuat semua
   const productsTampil = products.filter((p) => {
     if (!isPakaian) return true;
     const attrs = p.attributes || {};
@@ -164,9 +225,9 @@ function App() {
             <div className="alert alert-warning">
               <strong>⚠️ Stok Menipis</strong>
               <ul>
-                {produkMenipis.map((p) => (
-                  <li key={p.id}>
-                    {p.nama} — sisa {p.stok} (batas {p.stok_minimum}){p.nama_toko ? ` · ${p.nama_toko}` : ''}
+                {produkMenipis.map((p, i) => (
+                  <li key={`${p.id}-${i}`}>
+                    {p.nama} {p.ukuran || p.warna ? `(${[p.ukuran, p.warna].filter(Boolean).join('/')})` : ''} — sisa {p.stok} (batas {p.stok_minimum}){p.nama_toko ? ` · ${p.nama_toko}` : ''}
                   </li>
                 ))}
               </ul>
@@ -217,28 +278,83 @@ function App() {
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Nama</th><th>Harga</th><th>Stok</th><th>Cabang</th><th>Detail</th>
+                      <th>Nama</th><th>Harga</th><th>Total Stok</th><th>Cabang</th><th>Detail</th>
                       {(user?.role === 'owner' || user?.role === 'admin') && <th>Aksi</th>}
                     </tr>
                   </thead>
                   <tbody>
-                    {productsTampil.map((p) => (
-                      <tr key={p.id}>
-                        <td>{p.nama}</td>
-                        <td className="num">Rp {Number(p.harga).toLocaleString('id-ID')}</td>
-                        <td className="num">{p.stok}</td>
-                        <td>{p.nama_toko}</td>
-                        <td style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
-                          {Object.entries(p.attributes || {}).map(([k, v]) => `${k}: ${v}`).join(', ')}
-                        </td>
-                        {(user?.role === 'owner' || user?.role === 'admin') && (
-                          <td>
-                            <button className="btn btn-secondary btn-sm" onClick={() => { setProdukDiedit(p); setHalaman('tambah'); }}>Edit</button>{' '}
-                            <button className="btn btn-danger btn-sm" onClick={() => hapusProduk(p.id)}>Hapus</button>
-                          </td>
-                        )}
-                      </tr>
-                    ))}
+                    {productsTampil.map((p) => {
+                      const punyaVarian = p.variants && p.variants.length > 0;
+                      return (
+                        <>
+                          <tr key={p.id}>
+                            <td>{p.nama}</td>
+                            <td className="num">{tampilanHargaProduk(p)}</td>
+                            <td className="num">{totalStokProduk(p)}</td>
+                            <td>{p.nama_toko}</td>
+                            <td style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
+                              {Object.entries(p.attributes || {}).map(([k, v]) => `${k}: ${v}`).join(', ')}
+                            </td>
+                            {(user?.role === 'owner' || user?.role === 'admin') && (
+                              <td>
+                                {punyaVarian ? (
+                                  <button className="btn btn-secondary btn-sm" onClick={() => bukaKelolaVarian(p)}>
+                                    {produkDiperluas === p.id ? 'Tutup' : 'Kelola Varian'}
+                                  </button>
+                                ) : (
+                                  <button className="btn btn-secondary btn-sm" onClick={() => { setProdukDiedit(p); setHalaman('tambah'); }}>Edit</button>
+                                )}{' '}
+                                <button className="btn btn-danger btn-sm" onClick={() => hapusProduk(p.id)}>Hapus</button>
+                              </td>
+                            )}
+                          </tr>
+                          {produkDiperluas === p.id && punyaVarian && (
+                            <tr>
+                              <td colSpan={6} style={{ background: 'var(--color-bg)' }}>
+                                <div style={{ padding: '0.75rem' }}>
+                                  <strong style={{ fontSize: '0.8rem' }}>Varian Produk</strong>
+                                  <table className="data-table" style={{ marginTop: '0.5rem' }}>
+                                    <thead>
+                                      <tr><th>Ukuran</th><th>Warna</th><th>Stok</th><th>Harga (kosongkan = ikut harga dasar)</th><th></th></tr>
+                                    </thead>
+                                    <tbody>
+                                      {p.variants.map((v) => (
+                                        <tr key={v.id}>
+                                          <td>{v.ukuran || '-'}</td>
+                                          <td>{v.warna || '-'}</td>
+                                          <td>
+                                            <input
+                                              className="input"
+                                              type="number"
+                                              style={{ width: '80px' }}
+                                              value={editVarianValues[v.id]?.stok ?? v.stok}
+                                              onChange={(e) => ubahNilaiVarian(v.id, 'stok', e.target.value)}
+                                            />
+                                          </td>
+                                          <td>
+                                            <input
+                                              className="input"
+                                              type="number"
+                                              style={{ width: '100px' }}
+                                              placeholder={`Rp ${Number(p.harga).toLocaleString('id-ID')}`}
+                                              value={editVarianValues[v.id]?.harga ?? ''}
+                                              onChange={(e) => ubahNilaiVarian(v.id, 'harga', e.target.value)}
+                                            />
+                                          </td>
+                                          <td>
+                                            <button className="btn btn-primary btn-sm" onClick={() => simpanVarian(p, v)}>Simpan</button>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </>
+                      );
+                    })}
                   </tbody>
                 </table>
                 {productsTampil.length === 0 && <div className="empty-state">Tidak ada produk yang cocok dengan filter ini.</div>}

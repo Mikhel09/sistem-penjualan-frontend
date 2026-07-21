@@ -20,7 +20,7 @@ const FIELD_PER_KATEGORI_LAIN = {
 };
 
 function buatVarianKosong() {
-  return { ukuran: '', warna: '', stok: '' };
+  return { ukuran: '', warna: '', stok: '', harga: '' };
 }
 
 function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, produkDiedit, onSelesaiEdit }) {
@@ -29,6 +29,7 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
   const [stok, setStok] = useState('');
   const [stokMinimum, setStokMinimum] = useState('5');
   const [attrValues, setAttrValues] = useState({});
+  const [modeHarga, setModeHarga] = useState('sama'); // 'sama' | 'berbeda'
   const [varianList, setVarianList] = useState([buatVarianKosong()]);
   const [cabangList, setCabangList] = useState([]);
   const [storeIdDipilih, setStoreIdDipilih] = useState('');
@@ -60,6 +61,7 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
       setStok('');
       setStokMinimum('5');
       setAttrValues({});
+      setModeHarga('sama');
       setVarianList([buatVarianKosong()]);
     }
   }, [produkDiedit]);
@@ -101,7 +103,12 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
         setMessage('Tambahkan minimal 1 varian (ukuran/warna)');
         return;
       }
-      body.varian = varianValid.map((v) => ({ ukuran: v.ukuran, warna: v.warna, stok: Number(v.stok) || 0 }));
+      body.varian = varianValid.map((v) => ({
+        ukuran: v.ukuran,
+        warna: v.warna,
+        stok: Number(v.stok) || 0,
+        harga: modeHarga === 'berbeda' && v.harga ? Number(v.harga) : undefined,
+      }));
     } else if (!isPakaian) {
       body.stok = Number(stok);
     }
@@ -123,6 +130,7 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
       setStok('');
       setStokMinimum('5');
       setAttrValues({});
+      setModeHarga('sama');
       setVarianList([buatVarianKosong()]);
       if (onProdukDitambahkan) onProdukDitambahkan();
       if (isEdit && onSelesaiEdit) onSelesaiEdit();
@@ -132,7 +140,7 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
   };
 
   return (
-    <div className="card" style={{ maxWidth: '560px' }}>
+    <div className="card" style={{ maxWidth: '600px' }}>
       <h2 className="card-title">{isEdit ? 'Edit Produk' : 'Tambah Produk'} · <span className={`badge badge-${jenisUsaha}`}>{jenisUsaha}</span></h2>
       <form onSubmit={handleSubmit}>
         {butuhPilihCabang && !isEdit && (
@@ -154,7 +162,9 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
 
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <div className="form-group" style={{ flex: 1 }}>
-            <label className="form-label">Harga</label>
+            <label className="form-label">
+              {isPakaian ? 'Harga Dasar' : 'Harga'}
+            </label>
             <input className="input" type="number" value={harga} onChange={(e) => setHarga(e.target.value)} required />
           </div>
           {!isPakaian && (
@@ -213,7 +223,19 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
 
         {isPakaian && !isEdit && (
           <div className="form-group">
-            <label className="form-label">Varian (Ukuran / Warna / Stok)</label>
+            <label className="form-label">Harga Tiap Varian</label>
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.75rem', fontSize: '0.85rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <input type="radio" checked={modeHarga === 'sama'} onChange={() => setModeHarga('sama')} />
+                Sama untuk semua varian (pakai Harga Dasar)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <input type="radio" checked={modeHarga === 'berbeda'} onChange={() => setModeHarga('berbeda')} />
+                Berbeda tiap varian
+              </label>
+            </div>
+
+            <label className="form-label">Varian (Ukuran / Warna / Stok{modeHarga === 'berbeda' ? ' / Harga' : ''})</label>
             {varianList.map((v, index) => (
               <div key={index} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
                 <input
@@ -236,8 +258,18 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
                   placeholder="Stok"
                   value={v.stok}
                   onChange={(e) => handleVarianChange(index, 'stok', e.target.value)}
-                  style={{ width: '90px' }}
+                  style={{ width: '80px' }}
                 />
+                {modeHarga === 'berbeda' && (
+                  <input
+                    className="input"
+                    type="number"
+                    placeholder="Harga"
+                    value={v.harga}
+                    onChange={(e) => handleVarianChange(index, 'harga', e.target.value)}
+                    style={{ width: '100px' }}
+                  />
+                )}
                 {varianList.length > 1 && (
                   <button type="button" className="btn btn-danger btn-sm" onClick={() => hapusBarisVarian(index)}>✕</button>
                 )}
@@ -251,7 +283,7 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
 
         {isPakaian && isEdit && (
           <div className="alert alert-warning">
-            Untuk pakaian, stok per varian dikelola lewat menu <strong>Restock</strong> atau langsung di Daftar Produk (varian tidak diubah lewat form edit ini).
+            Untuk pakaian, stok & harga per varian diubah lewat tombol <strong>Kelola Varian</strong> di halaman Daftar Produk (bukan lewat form ini).
           </div>
         )}
 
