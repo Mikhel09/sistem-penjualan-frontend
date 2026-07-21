@@ -1,30 +1,12 @@
 import { useState, useEffect } from 'react';
 import { API_URL } from './api';
+import { JENIS_PRODUK_PAKAIAN, TARGET_USIA_PAKAIAN, SEGMEN_PAKAIAN } from './kategoriPakaian';
 
 const FIELD_PER_KATEGORI = {
   pakaian: [
-    {
-      key: 'jenis_pakaian',
-      label: 'Jenis Produk',
-      type: 'select',
-      options: [
-        'Atasan', 'Bawahan', 'Dress/Terusan', 'Outerwear (Jaket/Sweater)',
-        'Pakaian Dalam', 'Piyama/Pakaian Tidur', 'Setelan',
-        'Aksesoris', 'Tas', 'Alas Kaki', 'Seragam',
-      ],
-    },
-    {
-      key: 'target_usia',
-      label: 'Target Usia',
-      type: 'select',
-      options: ['Dewasa', 'Remaja', 'Anak-anak', 'Bayi/Balita'],
-    },
-    {
-      key: 'jenis_kelamin',
-      label: 'Segmen',
-      type: 'select',
-      options: ['Pria', 'Wanita', 'Unisex'],
-    },
+    { key: 'jenis_pakaian', label: 'Jenis Produk', type: 'select', options: JENIS_PRODUK_PAKAIAN },
+    { key: 'target_usia', label: 'Target Usia', type: 'select', options: TARGET_USIA_PAKAIAN },
+    { key: 'jenis_kelamin', label: 'Segmen', type: 'select', options: SEGMEN_PAKAIAN },
     { key: 'ukuran', label: 'Ukuran', type: 'text', placeholder: 'S / M / L / 38 / 27, dst' },
     { key: 'warna', label: 'Warna', type: 'text', placeholder: 'Hitam, Merah, dst' },
     { key: 'bahan', label: 'Bahan (opsional)', type: 'text', placeholder: 'Katun, Denim, Polyester, dst' },

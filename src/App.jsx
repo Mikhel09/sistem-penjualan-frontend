@@ -9,9 +9,10 @@ import KelolaCabang from './KelolaCabang';
 import RiwayatTransaksi from './RiwayatTransaksi';
 import Laporan from './Laporan';
 import Pelanggan from './Pelanggan';
-import { API_URL } from './api';
 import KelolaSupplier from './KelolaSupplier';
 import Restock from './Restock';
+import { API_URL } from './api';
+import { JENIS_PRODUK_PAKAIAN, TARGET_USIA_PAKAIAN, SEGMEN_PAKAIAN } from './kategoriPakaian';
 
 const MENU = [
   { key: 'produk', label: 'Daftar Produk', icon: '📦', roles: ['owner', 'admin', 'kasir'] },
@@ -20,10 +21,10 @@ const MENU = [
   { key: 'riwayat', label: 'Riwayat Transaksi', icon: '🕒', roles: ['owner', 'admin', 'kasir'] },
   { key: 'pelanggan', label: 'Pelanggan', icon: '👤', roles: ['owner', 'admin', 'kasir'] },
   { key: 'laporan', label: 'Laporan', icon: '📊', roles: ['owner', 'admin'] },
-  { key: 'staff', label: 'Kelola Staff', icon: '🧑‍💼', roles: ['owner'] },
-  { key: 'cabang', label: 'Kelola Cabang', icon: '🏬', roles: ['owner'] },
   { key: 'supplier', label: 'Supplier', icon: '🚚', roles: ['owner', 'admin'] },
   { key: 'restock', label: 'Restock', icon: '📥', roles: ['owner', 'admin'] },
+  { key: 'staff', label: 'Kelola Staff', icon: '🧑‍💼', roles: ['owner'] },
+  { key: 'cabang', label: 'Kelola Cabang', icon: '🏬', roles: ['owner'] },
 ];
 
 function App() {
@@ -34,6 +35,10 @@ function App() {
   const [halaman, setHalaman] = useState('produk');
   const [produkDiedit, setProdukDiedit] = useState(null);
   const [tampilanAuth, setTampilanAuth] = useState('login');
+
+  const [filterJenis, setFilterJenis] = useState('');
+  const [filterUsia, setFilterUsia] = useState('');
+  const [filterSegmen, setFilterSegmen] = useState('');
 
   const urlParams = new URLSearchParams(window.location.search);
   const resetToken = urlParams.get('token');
@@ -100,6 +105,17 @@ function App() {
   }
 
   const menuUntukRole = MENU.filter((m) => m.roles.includes(user?.role));
+  const isPakaian = user?.jenis_usaha === 'pakaian';
+
+  // Filter produk (khusus kategori pakaian) — dikerjakan di frontend karena datanya sudah dimuat semua
+  const productsTampil = products.filter((p) => {
+    if (!isPakaian) return true;
+    const attrs = p.attributes || {};
+    if (filterJenis && attrs.jenis_pakaian !== filterJenis) return false;
+    if (filterUsia && attrs.target_usia !== filterUsia) return false;
+    if (filterSegmen && attrs.jenis_kelamin !== filterSegmen) return false;
+    return true;
+  });
 
   return (
     <div className="app-shell">
@@ -162,9 +178,41 @@ function App() {
               <div className="page-header">
                 <div>
                   <h2 className="page-title">Daftar Produk</h2>
-                  <p className="page-desc">{products.length} produk terdaftar</p>
+                  <p className="page-desc">{productsTampil.length} dari {products.length} produk ditampilkan</p>
                 </div>
               </div>
+
+              {isPakaian && (
+                <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                  <select className="input" style={{ width: 'auto' }} value={filterJenis} onChange={(e) => setFilterJenis(e.target.value)}>
+                    <option value="">Semua Jenis Produk</option>
+                    {JENIS_PRODUK_PAKAIAN.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                  <select className="input" style={{ width: 'auto' }} value={filterUsia} onChange={(e) => setFilterUsia(e.target.value)}>
+                    <option value="">Semua Usia</option>
+                    {TARGET_USIA_PAKAIAN.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                  <select className="input" style={{ width: 'auto' }} value={filterSegmen} onChange={(e) => setFilterSegmen(e.target.value)}>
+                    <option value="">Semua Segmen</option>
+                    {SEGMEN_PAKAIAN.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                  {(filterJenis || filterUsia || filterSegmen) && (
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => { setFilterJenis(''); setFilterUsia(''); setFilterSegmen(''); }}
+                    >
+                      Reset Filter
+                    </button>
+                  )}
+                </div>
+              )}
+
               <div className="table-wrap">
                 <table className="data-table">
                   <thead>
@@ -174,7 +222,7 @@ function App() {
                     </tr>
                   </thead>
                   <tbody>
-                    {products.map((p) => (
+                    {productsTampil.map((p) => (
                       <tr key={p.id}>
                         <td>{p.nama}</td>
                         <td className="num">Rp {Number(p.harga).toLocaleString('id-ID')}</td>
@@ -193,7 +241,7 @@ function App() {
                     ))}
                   </tbody>
                 </table>
-                {products.length === 0 && <div className="empty-state">Belum ada produk. Tambahkan produk pertamamu.</div>}
+                {productsTampil.length === 0 && <div className="empty-state">Tidak ada produk yang cocok dengan filter ini.</div>}
               </div>
             </div>
           )}
@@ -217,15 +265,15 @@ function App() {
 
           {halaman === 'laporan' && <Laporan token={token} />}
 
+          {halaman === 'supplier' && <KelolaSupplier token={token} />}
+
+          {halaman === 'restock' && <Restock token={token} storeIdUser={user?.store_id} />}
+
           {halaman === 'staff' && <KelolaStaff token={token} />}
 
           {halaman === 'cabang' && <KelolaCabang token={token} />}
 
           {halaman === 'pelanggan' && <Pelanggan token={token} />}
-
-          {halaman === 'supplier' && <KelolaSupplier token={token} />}
-
-          {halaman === 'restock' && <Restock token={token} storeIdUser={user?.store_id} />}
         </main>
       </div>
     </div>

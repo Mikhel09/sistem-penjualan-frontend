@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { API_URL } from './api';
+import { JENIS_PRODUK_PAKAIAN, TARGET_USIA_PAKAIAN } from './kategoriPakaian';
 
 function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
   const [cabangList, setCabangList] = useState([]);
@@ -18,6 +19,8 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
 
   const butuhPilihCabang = !storeIdUser;
   const storeIdAktif = storeIdUser || storeIdDipilih;
+  const [filterJenis, setFilterJenis] = useState('');
+  const [filterUsia, setFilterUsia] = useState('');
 
   useEffect(() => {
     if (butuhPilihCabang) {
@@ -170,10 +173,35 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
     );
   }
 
+  const productsTampil = products.filter((p) => {
+  if (jenisUsaha !== 'pakaian') return true;
+  const attrs = p.attributes || {};
+  if (filterJenis && attrs.jenis_pakaian !== filterJenis) return false;
+  if (filterUsia && attrs.target_usia !== filterUsia) return false;
+  return true;
+});
+
   return (
     <div className="pos-layout">
       <div className="pos-catalog card">
         <h2 className="card-title">Pilih Produk</h2>
+
+        {jenisUsaha === 'pakaian' && (
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+            <select className="input" style={{ width: 'auto' }} value={filterJenis} onChange={(e) => setFilterJenis(e.target.value)}>
+              <option value="">Semua Jenis</option>
+              {JENIS_PRODUK_PAKAIAN.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+            <select className="input" style={{ width: 'auto' }} value={filterUsia} onChange={(e) => setFilterUsia(e.target.value)}>
+              <option value="">Semua Usia</option>
+              {TARGET_USIA_PAKAIAN.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {jenisUsaha === 'supermarket' && (
           <form onSubmit={cariByBarcode} style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
@@ -188,7 +216,7 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
           </form>
         )}
 
-        {products.map((p) => (
+        {productsTampil.map((p) => (
           <button key={p.id} className="product-btn" onClick={() => tambahKeKeranjang(p)}>
             <span>{p.nama} <span style={{ color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>(stok: {p.stok})</span></span>
             <span className="price">Rp {Number(p.harga).toLocaleString('id-ID')}</span>
