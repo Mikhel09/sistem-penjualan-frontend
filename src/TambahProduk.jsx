@@ -2,24 +2,26 @@ import { useState, useEffect } from 'react';
 import { API_URL } from './api';
 import { JENIS_PRODUK_PAKAIAN, TARGET_USIA_PAKAIAN, SEGMEN_PAKAIAN } from './kategoriPakaian';
 
-const FIELD_PER_KATEGORI = {
-  pakaian: [
-    { key: 'jenis_pakaian', label: 'Jenis Produk', type: 'select', options: JENIS_PRODUK_PAKAIAN },
-    { key: 'target_usia', label: 'Target Usia', type: 'select', options: TARGET_USIA_PAKAIAN },
-    { key: 'jenis_kelamin', label: 'Segmen', type: 'select', options: SEGMEN_PAKAIAN },
-    { key: 'ukuran', label: 'Ukuran', type: 'text', placeholder: 'S / M / L / 38 / 27, dst' },
-    { key: 'warna', label: 'Warna', type: 'text', placeholder: 'Hitam, Merah, dst' },
-    { key: 'bahan', label: 'Bahan (opsional)', type: 'text', placeholder: 'Katun, Denim, Polyester, dst' },
-  ],
+const FIELD_ATTRIBUT_PAKAIAN = [
+  { key: 'jenis_pakaian', label: 'Jenis Produk', options: JENIS_PRODUK_PAKAIAN },
+  { key: 'target_usia', label: 'Target Usia', options: TARGET_USIA_PAKAIAN },
+  { key: 'jenis_kelamin', label: 'Segmen', options: SEGMEN_PAKAIAN },
+];
+
+const FIELD_PER_KATEGORI_LAIN = {
   makanan_minuman: [
-    { key: 'kategori_menu', label: 'Kategori Menu', type: 'text', placeholder: 'Makanan / Minuman' },
-    { key: 'level_pedas', label: 'Level Pedas (0-5)', type: 'text', placeholder: '0' },
+    { key: 'kategori_menu', label: 'Kategori Menu', placeholder: 'Makanan / Minuman' },
+    { key: 'level_pedas', label: 'Level Pedas (0-5)', placeholder: '0' },
   ],
   supermarket: [
-    { key: 'berat', label: 'Berat/Kemasan', type: 'text', placeholder: '500g, 1L, dst' },
-    { key: 'barcode', label: 'Barcode', type: 'text', placeholder: '899...' },
+    { key: 'berat', label: 'Berat/Kemasan', placeholder: '500g, 1L, dst' },
+    { key: 'barcode', label: 'Barcode', placeholder: '899...' },
   ],
 };
+
+function buatVarianKosong() {
+  return { ukuran: '', warna: '', stok: '' };
+}
 
 function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, produkDiedit, onSelesaiEdit }) {
   const [nama, setNama] = useState('');
@@ -27,13 +29,15 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
   const [stok, setStok] = useState('');
   const [stokMinimum, setStokMinimum] = useState('5');
   const [attrValues, setAttrValues] = useState({});
+  const [varianList, setVarianList] = useState([buatVarianKosong()]);
   const [cabangList, setCabangList] = useState([]);
   const [storeIdDipilih, setStoreIdDipilih] = useState('');
   const [message, setMessage] = useState('');
 
-  const fieldsKategori = FIELD_PER_KATEGORI[jenisUsaha] || [];
+  const isPakaian = jenisUsaha === 'pakaian';
   const isEdit = Boolean(produkDiedit);
   const butuhPilihCabang = !storeIdUser;
+  const fieldLainKategori = FIELD_PER_KATEGORI_LAIN[jenisUsaha] || [];
 
   useEffect(() => {
     if (butuhPilihCabang) {
@@ -56,12 +60,20 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
       setStok('');
       setStokMinimum('5');
       setAttrValues({});
+      setVarianList([buatVarianKosong()]);
     }
   }, [produkDiedit]);
 
   const handleAttrChange = (key, value) => {
     setAttrValues((prev) => ({ ...prev, [key]: value }));
   };
+
+  const handleVarianChange = (index, field, value) => {
+    setVarianList((prev) => prev.map((v, i) => (i === index ? { ...v, [field]: value } : v)));
+  };
+
+  const tambahBarisVarian = () => setVarianList((prev) => [...prev, buatVarianKosong()]);
+  const hapusBarisVarian = (index) => setVarianList((prev) => prev.filter((_, i) => i !== index));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -75,18 +87,30 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
     const url = isEdit ? `${API_URL}/api/products/${produkDiedit.id}` : `${API_URL}/api/products`;
     const method = isEdit ? 'PUT' : 'POST';
 
+    const body = {
+      nama,
+      harga: Number(harga),
+      stok_minimum: Number(stokMinimum),
+      attributes: attrValues,
+      store_id: storeIdUser || Number(storeIdDipilih),
+    };
+
+    if (isPakaian && !isEdit) {
+      const varianValid = varianList.filter((v) => v.ukuran || v.warna);
+      if (varianValid.length === 0) {
+        setMessage('Tambahkan minimal 1 varian (ukuran/warna)');
+        return;
+      }
+      body.varian = varianValid.map((v) => ({ ukuran: v.ukuran, warna: v.warna, stok: Number(v.stok) || 0 }));
+    } else if (!isPakaian) {
+      body.stok = Number(stok);
+    }
+
     try {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          nama,
-          harga: Number(harga),
-          stok: Number(stok),
-          stok_minimum: Number(stokMinimum),
-          attributes: attrValues,
-          store_id: storeIdUser || Number(storeIdDipilih),
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -99,6 +123,7 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
       setStok('');
       setStokMinimum('5');
       setAttrValues({});
+      setVarianList([buatVarianKosong()]);
       if (onProdukDitambahkan) onProdukDitambahkan();
       if (isEdit && onSelesaiEdit) onSelesaiEdit();
     } catch (err) {
@@ -107,7 +132,7 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
   };
 
   return (
-    <div className="card" style={{ maxWidth: '480px' }}>
+    <div className="card" style={{ maxWidth: '560px' }}>
       <h2 className="card-title">{isEdit ? 'Edit Produk' : 'Tambah Produk'} · <span className={`badge badge-${jenisUsaha}`}>{jenisUsaha}</span></h2>
       <form onSubmit={handleSubmit}>
         {butuhPilihCabang && !isEdit && (
@@ -132,20 +157,22 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
             <label className="form-label">Harga</label>
             <input className="input" type="number" value={harga} onChange={(e) => setHarga(e.target.value)} required />
           </div>
-          <div className="form-group" style={{ flex: 1 }}>
-            <label className="form-label">Stok</label>
-            <input className="input" type="number" value={stok} onChange={(e) => setStok(e.target.value)} required />
-          </div>
+          {!isPakaian && (
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label">Stok</label>
+              <input className="input" type="number" value={stok} onChange={(e) => setStok(e.target.value)} required />
+            </div>
+          )}
           <div className="form-group" style={{ flex: 1 }}>
             <label className="form-label">Stok Minimum</label>
             <input className="input" type="number" value={stokMinimum} onChange={(e) => setStokMinimum(e.target.value)} />
           </div>
         </div>
 
-        {fieldsKategori.map((field) => (
-          <div key={field.key} className="form-group">
-            <label className="form-label">{field.label}</label>
-            {field.type === 'select' ? (
+        {isPakaian &&
+          FIELD_ATTRIBUT_PAKAIAN.map((field) => (
+            <div key={field.key} className="form-group">
+              <label className="form-label">{field.label}</label>
               <select
                 className="input"
                 value={attrValues[field.key] || ''}
@@ -156,16 +183,77 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
                   <option key={opt} value={opt}>{opt}</option>
                 ))}
               </select>
-            ) : (
+            </div>
+          ))}
+
+        {isPakaian && (
+          <div className="form-group">
+            <label className="form-label">Bahan (opsional)</label>
+            <input
+              className="input"
+              placeholder="Katun, Denim, Polyester, dst"
+              value={attrValues.bahan || ''}
+              onChange={(e) => handleAttrChange('bahan', e.target.value)}
+            />
+          </div>
+        )}
+
+        {!isPakaian &&
+          fieldLainKategori.map((field) => (
+            <div key={field.key} className="form-group">
+              <label className="form-label">{field.label}</label>
               <input
                 className="input"
                 placeholder={field.placeholder}
                 value={attrValues[field.key] || ''}
                 onChange={(e) => handleAttrChange(field.key, e.target.value)}
               />
-            )}
+            </div>
+          ))}
+
+        {isPakaian && !isEdit && (
+          <div className="form-group">
+            <label className="form-label">Varian (Ukuran / Warna / Stok)</label>
+            {varianList.map((v, index) => (
+              <div key={index} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <input
+                  className="input"
+                  placeholder="Ukuran"
+                  value={v.ukuran}
+                  onChange={(e) => handleVarianChange(index, 'ukuran', e.target.value)}
+                  style={{ flex: 1 }}
+                />
+                <input
+                  className="input"
+                  placeholder="Warna"
+                  value={v.warna}
+                  onChange={(e) => handleVarianChange(index, 'warna', e.target.value)}
+                  style={{ flex: 1 }}
+                />
+                <input
+                  className="input"
+                  type="number"
+                  placeholder="Stok"
+                  value={v.stok}
+                  onChange={(e) => handleVarianChange(index, 'stok', e.target.value)}
+                  style={{ width: '90px' }}
+                />
+                {varianList.length > 1 && (
+                  <button type="button" className="btn btn-danger btn-sm" onClick={() => hapusBarisVarian(index)}>✕</button>
+                )}
+              </div>
+            ))}
+            <button type="button" className="btn btn-secondary btn-sm" onClick={tambahBarisVarian}>
+              + Tambah Varian
+            </button>
           </div>
-        ))}
+        )}
+
+        {isPakaian && isEdit && (
+          <div className="alert alert-warning">
+            Untuk pakaian, stok per varian dikelola lewat menu <strong>Restock</strong> atau langsung di Daftar Produk (varian tidak diubah lewat form edit ini).
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
           <button type="submit" className="btn btn-primary">
