@@ -45,6 +45,10 @@ function tampilanHargaProduk(p) {
   return `Rp ${Number(p.harga).toLocaleString('id-ID')}`;
 }
 
+function varianBaruKosong() {
+  return { ukuran: '', warna: '', stok: '', harga: '' };
+}
+
 function App() {
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
@@ -56,7 +60,10 @@ function App() {
   const [produkDiperluas, setProdukDiperluas] = useState(null);
   const [editVarianValues, setEditVarianValues] = useState({});
   const [savingVariantId, setSavingVariantId] = useState(null);
-  const [variantMessage, setVariantMessage] = useState({}); // { [variantId]: { tipe: 'sukses'|'error', teks } }
+  const [variantMessage, setVariantMessage] = useState({});
+  const [formVarianBaru, setFormVarianBaru] = useState(varianBaruKosong());
+  const [savingVarianBaru, setSavingVarianBaru] = useState(false);
+  const [pesanVarianBaru, setPesanVarianBaru] = useState(null);
 
   const [filterJenis, setFilterJenis] = useState('');
   const [filterUsia, setFilterUsia] = useState('');
@@ -120,6 +127,8 @@ function App() {
     }
     setEditVarianValues(initial);
     setVariantMessage({});
+    setFormVarianBaru(varianBaruKosong());
+    setPesanVarianBaru(null);
   };
 
   const ubahNilaiVarian = (variantId, field, value) => {
@@ -163,6 +172,41 @@ function App() {
       setVariantMessage((prev) => ({ ...prev, [variant.id]: { tipe: 'error', teks: 'Tidak bisa terhubung ke server' } }));
     } finally {
       setSavingVariantId(null);
+    }
+  };
+
+  const tambahVarianBaru = async (produk) => {
+    if (!formVarianBaru.ukuran && !formVarianBaru.warna) {
+      setPesanVarianBaru({ tipe: 'error', teks: 'Isi minimal Ukuran atau Warna' });
+      return;
+    }
+    setSavingVarianBaru(true);
+    setPesanVarianBaru(null);
+    try {
+      const res = await fetch(`${API_URL}/api/products/${produk.id}/variants`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          ukuran: formVarianBaru.ukuran,
+          warna: formVarianBaru.warna,
+          stok: Number(formVarianBaru.stok) || 0,
+          harga: formVarianBaru.harga && formVarianBaru.harga.trim() !== '' ? Number(formVarianBaru.harga) : null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPesanVarianBaru({ tipe: 'error', teks: data.error || 'Gagal menambah varian' });
+        return;
+      }
+      setPesanVarianBaru({ tipe: 'sukses', teks: 'Varian baru ditambahkan!' });
+      setFormVarianBaru(varianBaruKosong());
+      muatProduk();
+      muatProdukMenipis();
+      setTimeout(() => setPesanVarianBaru(null), 3000);
+    } catch (err) {
+      setPesanVarianBaru({ tipe: 'error', teks: 'Tidak bisa terhubung ke server' });
+    } finally {
+      setSavingVarianBaru(false);
     }
   };
 
@@ -296,7 +340,7 @@ function App() {
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Nama</th><th>Harga</th><th>Total Stok</th><th>Cabang</th><th>Detail</th>
+                      <th>Nama</th><th style={{ textAlign: 'center' }}>Harga</th><th>Total Stok</th><th>Cabang</th><th>Detail</th>
                       {(user?.role === 'owner' || user?.role === 'admin') && <th>Aksi</th>}
                     </tr>
                   </thead>
@@ -307,7 +351,7 @@ function App() {
                         <Fragment key={p.id}>
                           <tr>
                             <td>{p.nama}</td>
-                            <td className="num">{tampilanHargaProduk(p)}</td>
+                            <td style={{ fontFamily: 'var(--font-mono)', textAlign: 'center' }}>{tampilanHargaProduk(p)}</td>
                             <td className="num">{totalStokProduk(p)}</td>
                             <td>{p.nama_toko}</td>
                             <td style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
@@ -381,6 +425,64 @@ function App() {
                                           </tr>
                                         );
                                       })}
+
+                                      {/* Baris form tambah varian baru */}
+                                      <tr style={{ background: 'var(--color-surface)' }}>
+                                        <td>
+                                          <input
+                                            className="input"
+                                            placeholder="Ukuran"
+                                            style={{ width: '80px' }}
+                                            value={formVarianBaru.ukuran}
+                                            onChange={(e) => setFormVarianBaru((prev) => ({ ...prev, ukuran: e.target.value }))}
+                                          />
+                                        </td>
+                                        <td>
+                                          <input
+                                            className="input"
+                                            placeholder="Warna"
+                                            style={{ width: '90px' }}
+                                            value={formVarianBaru.warna}
+                                            onChange={(e) => setFormVarianBaru((prev) => ({ ...prev, warna: e.target.value }))}
+                                          />
+                                        </td>
+                                        <td>
+                                          <input
+                                            className="input"
+                                            type="number"
+                                            placeholder="Stok"
+                                            style={{ width: '80px' }}
+                                            value={formVarianBaru.stok}
+                                            onChange={(e) => setFormVarianBaru((prev) => ({ ...prev, stok: e.target.value }))}
+                                          />
+                                        </td>
+                                        <td>
+                                          <input
+                                            className="input"
+                                            type="number"
+                                            placeholder={`Rp ${Number(p.harga).toLocaleString('id-ID')}`}
+                                            style={{ width: '100px' }}
+                                            value={formVarianBaru.harga}
+                                            onChange={(e) => setFormVarianBaru((prev) => ({ ...prev, harga: e.target.value }))}
+                                          />
+                                        </td>
+                                        <td>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <button
+                                              className="btn btn-primary btn-sm"
+                                              disabled={savingVarianBaru}
+                                              onClick={() => tambahVarianBaru(p)}
+                                            >
+                                              {savingVarianBaru ? 'Menambah...' : '+ Tambah Varian'}
+                                            </button>
+                                            {pesanVarianBaru && (
+                                              <span style={{ fontSize: '0.78rem', color: pesanVarianBaru.tipe === 'sukses' ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                                                {pesanVarianBaru.tipe === 'sukses' ? '✓ ' : '✕ '}{pesanVarianBaru.teks}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </td>
+                                      </tr>
                                     </tbody>
                                   </table>
                                 </div>
