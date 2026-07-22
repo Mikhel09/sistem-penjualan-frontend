@@ -13,6 +13,8 @@ import KelolaSupplier from './KelolaSupplier';
 import Restock from './Restock';
 import BarcodeLabel from './BarcodeLabel';
 import KoreksiStokModal from './KoreksiStokModal';
+import ToastContainer from './ToastContainer';
+import { showToast } from './toast';
 import { API_URL } from './api';
 import { JENIS_PRODUK_PAKAIAN, TARGET_USIA_PAKAIAN, SEGMEN_PAKAIAN } from './kategoriPakaian';
 
@@ -48,7 +50,7 @@ function tampilanHargaProduk(p) {
 }
 
 function varianBaruKosong() {
-  return { ukuran: '', warna: '', stok: '', harga: '' };
+  return { ukuran: '', warna: '', harga: '' }; // tidak ada 'stok' lagi — selalu mulai dari 0
 }
 
 function App() {
@@ -62,12 +64,10 @@ function App() {
   const [produkDiperluas, setProdukDiperluas] = useState(null);
   const [editVarianValues, setEditVarianValues] = useState({});
   const [savingVariantId, setSavingVariantId] = useState(null);
-  const [variantMessage, setVariantMessage] = useState({});
   const [formVarianBaru, setFormVarianBaru] = useState(varianBaruKosong());
   const [savingVarianBaru, setSavingVarianBaru] = useState(false);
-  const [pesanVarianBaru, setPesanVarianBaru] = useState(null);
   const [barcodeDipilih, setBarcodeDipilih] = useState(null);
-  const [koreksiDipilih, setKoreksiDipilih] = useState(null); // { produkId, variantId, namaTampil, stokSaatIni }
+  const [koreksiDipilih, setKoreksiDipilih] = useState(null);
 
   const [filterJenis, setFilterJenis] = useState('');
   const [filterUsia, setFilterUsia] = useState('');
@@ -85,6 +85,15 @@ function App() {
     setToken(null);
     setUser(null);
     setHalaman('produk');
+  };
+
+  // Dipanggil setiap kali pindah menu di sidebar — membersihkan panel yang mungkin masih terbuka
+  const pindahHalaman = (key) => {
+    if (key === 'tambah') setProdukDiedit(null);
+    setProdukDiperluas(null);
+    setEditVarianValues({});
+    setFormVarianBaru(varianBaruKosong());
+    setHalaman(key);
   };
 
   const muatProduk = () => {
@@ -109,13 +118,14 @@ function App() {
       });
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error || 'Gagal menghapus produk');
+        showToast(data.error || 'Gagal menghapus produk', 'error');
         return;
       }
+      showToast('Produk berhasil dihapus');
       muatProduk();
       muatProdukMenipis();
     } catch (err) {
-      alert('Tidak bisa terhubung ke server');
+      showToast('Tidak bisa terhubung ke server', 'error');
     }
   };
 
@@ -130,9 +140,7 @@ function App() {
       initial[v.id] = { harga: v.harga != null ? String(v.harga) : '', ukuran: v.ukuran || '', warna: v.warna || '' };
     }
     setEditVarianValues(initial);
-    setVariantMessage({});
     setFormVarianBaru(varianBaruKosong());
-    setPesanVarianBaru(null);
   };
 
   const ubahNilaiVarian = (variantId, field, value) => {
@@ -142,11 +150,9 @@ function App() {
     }));
   };
 
-  // Sekarang HANYA mengubah ukuran/warna/harga — stok tidak lagi bisa diubah lewat sini
   const simpanVarian = async (produk, variant) => {
     const nilai = editVarianValues[variant.id];
     setSavingVariantId(variant.id);
-    setVariantMessage((prev) => ({ ...prev, [variant.id]: null }));
 
     try {
       const res = await fetch(`${API_URL}/api/products/${produk.id}/variants/${variant.id}`, {
@@ -155,26 +161,22 @@ function App() {
         body: JSON.stringify({
           ukuran: nilai.ukuran,
           warna: nilai.warna,
-          stok: variant.stok, // dikirim tidak berubah, sengaja tidak diedit di sini
+          stok: variant.stok, // tidak berubah, stok memang tidak diedit di sini
           harga: nilai.harga && nilai.harga.trim() !== '' ? Number(nilai.harga) : null,
         }),
       });
       const data = await res.json();
 
       if (!res.ok) {
-        setVariantMessage((prev) => ({ ...prev, [variant.id]: { tipe: 'error', teks: data.error || 'Gagal menyimpan' } }));
+        showToast(data.error || 'Gagal menyimpan', 'error');
         return;
       }
 
-      setVariantMessage((prev) => ({ ...prev, [variant.id]: { tipe: 'sukses', teks: 'Tersimpan!' } }));
+      showToast('Varian berhasil diperbarui!');
       muatProduk();
       muatProdukMenipis();
-
-      setTimeout(() => {
-        setVariantMessage((prev) => ({ ...prev, [variant.id]: null }));
-      }, 3000);
     } catch (err) {
-      setVariantMessage((prev) => ({ ...prev, [variant.id]: { tipe: 'error', teks: 'Tidak bisa terhubung ke server' } }));
+      showToast('Tidak bisa terhubung ke server', 'error');
     } finally {
       setSavingVariantId(null);
     }
@@ -182,11 +184,10 @@ function App() {
 
   const tambahVarianBaru = async (produk) => {
     if (!formVarianBaru.ukuran && !formVarianBaru.warna) {
-      setPesanVarianBaru({ tipe: 'error', teks: 'Isi minimal Ukuran atau Warna' });
+      showToast('Isi minimal Ukuran atau Warna', 'error');
       return;
     }
     setSavingVarianBaru(true);
-    setPesanVarianBaru(null);
     try {
       const res = await fetch(`${API_URL}/api/products/${produk.id}/variants`, {
         method: 'POST',
@@ -194,22 +195,21 @@ function App() {
         body: JSON.stringify({
           ukuran: formVarianBaru.ukuran,
           warna: formVarianBaru.warna,
-          stok: Number(formVarianBaru.stok) || 0,
+          stok: 0, // selalu mulai dari 0 — isi stoknya lewat Restock setelah ini
           harga: formVarianBaru.harga && formVarianBaru.harga.trim() !== '' ? Number(formVarianBaru.harga) : null,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setPesanVarianBaru({ tipe: 'error', teks: data.error || 'Gagal menambah varian' });
+        showToast(data.error || 'Gagal menambah varian', 'error');
         return;
       }
-      setPesanVarianBaru({ tipe: 'sukses', teks: 'Varian baru ditambahkan!' });
+      showToast('Varian baru ditambahkan! Isi stoknya lewat menu Restock.');
       setFormVarianBaru(varianBaruKosong());
       muatProduk();
       muatProdukMenipis();
-      setTimeout(() => setPesanVarianBaru(null), 3000);
     } catch (err) {
-      setPesanVarianBaru({ tipe: 'error', teks: 'Tidak bisa terhubung ke server' });
+      showToast('Tidak bisa terhubung ke server', 'error');
     } finally {
       setSavingVarianBaru(false);
     }
@@ -247,6 +247,8 @@ function App() {
 
   return (
     <div className="app-shell">
+      <ToastContainer />
+
       <aside className="sidebar">
         <div className="sidebar-brand">
           <div className="sidebar-brand-name">{user?.nama_bisnis}</div>
@@ -258,10 +260,7 @@ function App() {
             <button
               key={m.key}
               className={`sidebar-nav-item ${halaman === m.key ? 'active' : ''}`}
-              onClick={() => {
-                if (m.key === 'tambah') setProdukDiedit(null);
-                setHalaman(m.key);
-              }}
+              onClick={() => pindahHalaman(m.key)}
             >
               <span className="sidebar-icon">{m.icon}</span>
               {m.label}
@@ -371,7 +370,7 @@ function App() {
                                     </button>
                                   ) : (
                                     <>
-                                      <button className="btn btn-secondary btn-sm" onClick={() => { setProdukDiedit(p); setHalaman('tambah'); }}>Edit</button>
+                                      <button className="btn btn-secondary btn-sm" onClick={() => { setProdukDiedit(p); pindahHalaman('tambah'); }}>Edit</button>
                                       <button
                                         className="btn btn-secondary btn-sm"
                                         onClick={() => setBarcodeDipilih({ kode: p.sku, judul: p.nama, subJudul: `Rp ${Number(p.harga).toLocaleString('id-ID')}` })}
@@ -397,15 +396,14 @@ function App() {
                                 <div style={{ padding: '0.75rem' }}>
                                   <strong style={{ fontSize: '0.8rem' }}>Varian Produk</strong>
                                   <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', margin: '4px 0 8px 0' }}>
-                                    Stok di sini hanya bisa ditambah lewat menu <strong>Restock</strong>, atau diperbaiki lewat tombol <strong>⚙️ Koreksi</strong> di tiap baris.
+                                    Stok di sini hanya bisa ditambah lewat menu <strong>Restock</strong>, atau diperbaiki lewat tombol <strong>⚙️</strong>.
                                   </p>
                                   <table className="data-table" style={{ marginTop: '0.5rem' }}>
                                     <thead>
-                                      <tr><th>Ukuran</th><th>Warna</th><th>Stok</th><th>Harga (kosongkan = ikut harga dasar)</th><th style={{ minWidth: '220px' }}></th></tr>
+                                      <tr><th>Ukuran</th><th>Warna</th><th>Stok</th><th>Harga (kosongkan = ikut harga dasar)</th><th style={{ minWidth: '200px' }}></th></tr>
                                     </thead>
                                     <tbody>
                                       {p.variants.map((v) => {
-                                        const pesan = variantMessage[v.id];
                                         const sedangSimpan = savingVariantId === v.id;
                                         return (
                                           <tr key={v.id}>
@@ -437,7 +435,7 @@ function App() {
                                               />
                                             </td>
                                             <td>
-                                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                 <button
                                                   className="btn btn-secondary btn-sm"
                                                   onClick={() => setBarcodeDipilih({
@@ -466,11 +464,6 @@ function App() {
                                                 >
                                                   {sedangSimpan ? 'Menyimpan...' : 'Simpan'}
                                                 </button>
-                                                {pesan && (
-                                                  <span style={{ fontSize: '0.75rem', color: pesan.tipe === 'sukses' ? 'var(--color-success)' : 'var(--color-danger)' }}>
-                                                    {pesan.tipe === 'sukses' ? '✓' : '✕'} {pesan.teks}
-                                                  </span>
-                                                )}
                                               </div>
                                             </td>
                                           </tr>
@@ -496,16 +489,7 @@ function App() {
                                             onChange={(e) => setFormVarianBaru((prev) => ({ ...prev, warna: e.target.value }))}
                                           />
                                         </td>
-                                        <td>
-                                          <input
-                                            className="input"
-                                            type="number"
-                                            placeholder="Stok awal"
-                                            style={{ width: '80px' }}
-                                            value={formVarianBaru.stok}
-                                            onChange={(e) => setFormVarianBaru((prev) => ({ ...prev, stok: e.target.value }))}
-                                          />
-                                        </td>
+                                        <td style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>0 (restock setelahnya)</td>
                                         <td>
                                           <input
                                             className="input"
@@ -517,20 +501,13 @@ function App() {
                                           />
                                         </td>
                                         <td>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <button
-                                              className="btn btn-primary btn-sm"
-                                              disabled={savingVarianBaru}
-                                              onClick={() => tambahVarianBaru(p)}
-                                            >
-                                              {savingVarianBaru ? 'Menambah...' : '+ Tambah Varian Baru'}
-                                            </button>
-                                            {pesanVarianBaru && (
-                                              <span style={{ fontSize: '0.75rem', color: pesanVarianBaru.tipe === 'sukses' ? 'var(--color-success)' : 'var(--color-danger)' }}>
-                                                {pesanVarianBaru.tipe === 'sukses' ? '✓' : '✕'} {pesanVarianBaru.teks}
-                                              </span>
-                                            )}
-                                          </div>
+                                          <button
+                                            className="btn btn-primary btn-sm"
+                                            disabled={savingVarianBaru}
+                                            onClick={() => tambahVarianBaru(p)}
+                                          >
+                                            {savingVarianBaru ? 'Menambah...' : '+ Tambah Varian Baru'}
+                                          </button>
                                         </td>
                                       </tr>
                                     </tbody>
@@ -556,7 +533,7 @@ function App() {
               storeIdUser={user?.store_id}
               onProdukDitambahkan={() => { muatProduk(); muatProdukMenipis(); }}
               produkDiedit={produkDiedit}
-              onSelesaiEdit={() => { setProdukDiedit(null); setHalaman('produk'); }}
+              onSelesaiEdit={() => { setProdukDiedit(null); pindahHalaman('produk'); }}
             />
           )}
 
@@ -597,7 +574,7 @@ function App() {
           namaTampil={koreksiDipilih.namaTampil}
           stokSaatIni={koreksiDipilih.stokSaatIni}
           onTutup={() => setKoreksiDipilih(null)}
-          onSukses={() => { muatProduk(); muatProdukMenipis(); }}
+          onSukses={() => { muatProduk(); muatProdukMenipis(); showToast('Koreksi stok berhasil disimpan!'); }}
         />
       )}
     </div>

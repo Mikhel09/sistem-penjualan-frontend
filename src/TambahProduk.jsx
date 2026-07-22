@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { showToast } from './toast';
 import { API_URL } from './api';
 import { JENIS_PRODUK_PAKAIAN, TARGET_USIA_PAKAIAN, SEGMEN_PAKAIAN } from './kategoriPakaian';
 
@@ -20,7 +21,7 @@ const FIELD_PER_KATEGORI_LAIN = {
 };
 
 function buatVarianKosong() {
-  return { ukuran: '', warna: '', stok: '', harga: '' };
+  return { ukuran: '', warna: '', harga: '' }; 
 }
 
 function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, produkDiedit, onSelesaiEdit }) {
@@ -103,12 +104,7 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
         setMessage('Tambahkan minimal 1 varian (ukuran/warna)');
         return;
       }
-      body.varian = varianValid.map((v) => ({
-        ukuran: v.ukuran,
-        warna: v.warna,
-        stok: Number(v.stok) || 0,
-        harga: modeHarga === 'berbeda' && v.harga ? Number(v.harga) : undefined,
-      }));
+      body.varian = varianValid.map((v) => ({ ukuran: v.ukuran, warna: v.warna, stok: 0, harga: modeHarga === 'berbeda' && v.harga ? Number(v.harga) : undefined }));
     } else if (!isPakaian) {
       body.stok = Number(stok);
     }
@@ -121,10 +117,10 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
       });
       const data = await res.json();
       if (!res.ok) {
-        setMessage(data.error || 'Gagal menyimpan produk');
+        showToast(data.error || 'Gagal menyimpan produk', 'error');
         return;
       }
-      setMessage(isEdit ? 'Produk berhasil diubah!' : 'Produk berhasil ditambahkan!');
+      showToast(isEdit ? 'Produk berhasil diubah!' : 'Produk berhasil ditambahkan! Jangan lupa isi stok lewat Restock.');
       setNama('');
       setHarga('');
       setStok('');
@@ -261,14 +257,6 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
                   onChange={(e) => handleVarianChange(index, 'warna', e.target.value)}
                   style={{ flex: 1 }}
                 />
-                <input
-                  className="input"
-                  type="number"
-                  placeholder="Stok"
-                  value={v.stok}
-                  onChange={(e) => handleVarianChange(index, 'stok', e.target.value)}
-                  style={{ width: '80px' }}
-                />
                 {modeHarga === 'berbeda' && (
                   <input
                     className="input"
@@ -284,6 +272,9 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
                 )}
               </div>
             ))}
+            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '8px' }}>
+              Stok awal semua varian dimulai dari 0 — isi stok sungguhan lewat menu <strong>Restock</strong> setelah produk ini tersimpan.
+            </p>
             <button type="button" className="btn btn-secondary btn-sm" onClick={tambahBarisVarian}>
               + Tambah Varian
             </button>
