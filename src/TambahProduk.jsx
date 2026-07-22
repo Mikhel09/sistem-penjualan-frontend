@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { showToast } from './toast';
 import { API_URL } from './api';
+import { showToast } from './toast';
 import { JENIS_PRODUK_PAKAIAN, TARGET_USIA_PAKAIAN, SEGMEN_PAKAIAN } from './kategoriPakaian';
 
 const FIELD_ATTRIBUT_PAKAIAN = [
@@ -20,8 +20,13 @@ const FIELD_PER_KATEGORI_LAIN = {
   ],
 };
 
+function bulatkanAngka(nilai) {
+  if (nilai === null || nilai === undefined || nilai === '') return '';
+  return String(Math.round(Number(nilai)));
+}
+
 function buatVarianKosong() {
-  return { ukuran: '', warna: '', harga: '' }; 
+  return { ukuran: '', warna: '', harga: '' };
 }
 
 function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, produkDiedit, onSelesaiEdit }) {
@@ -30,11 +35,10 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
   const [stok, setStok] = useState('');
   const [stokMinimum, setStokMinimum] = useState('5');
   const [attrValues, setAttrValues] = useState({});
-  const [modeHarga, setModeHarga] = useState('sama'); // 'sama' | 'berbeda'
+  const [modeHarga, setModeHarga] = useState('sama');
   const [varianList, setVarianList] = useState([buatVarianKosong()]);
   const [cabangList, setCabangList] = useState([]);
   const [storeIdDipilih, setStoreIdDipilih] = useState('');
-  const [message, setMessage] = useState('');
 
   const isPakaian = jenisUsaha === 'pakaian';
   const isEdit = Boolean(produkDiedit);
@@ -52,9 +56,9 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
   useEffect(() => {
     if (produkDiedit) {
       setNama(produkDiedit.nama);
-      setHarga(produkDiedit.harga);
-      setStok(produkDiedit.stok);
-      setStokMinimum(produkDiedit.stok_minimum ?? 5);
+      setHarga(bulatkanAngka(produkDiedit.harga));
+      setStok(bulatkanAngka(produkDiedit.stok));
+      setStokMinimum(bulatkanAngka(produkDiedit.stok_minimum) || '5');
       setAttrValues(produkDiedit.attributes || {});
     } else {
       setNama('');
@@ -80,10 +84,9 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage('');
 
     if (butuhPilihCabang && !isEdit && !storeIdDipilih) {
-      setMessage('Pilih cabang untuk produk ini');
+      showToast('Pilih cabang untuk produk ini', 'error');
       return;
     }
 
@@ -101,11 +104,16 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
     if (isPakaian && !isEdit) {
       const varianValid = varianList.filter((v) => v.ukuran || v.warna);
       if (varianValid.length === 0) {
-        setMessage('Tambahkan minimal 1 varian (ukuran/warna)');
+        showToast('Tambahkan minimal 1 varian (ukuran/warna)', 'error');
         return;
       }
-      body.varian = varianValid.map((v) => ({ ukuran: v.ukuran, warna: v.warna, stok: 0, harga: modeHarga === 'berbeda' && v.harga ? Number(v.harga) : undefined }));
-    } else if (!isPakaian) {
+      body.varian = varianValid.map((v) => ({
+        ukuran: v.ukuran,
+        warna: v.warna,
+        stok: 0,
+        harga: modeHarga === 'berbeda' && v.harga ? Number(v.harga) : undefined,
+      }));
+    } else if (!isPakaian && !isEdit) {
       body.stok = Number(stok);
     }
 
@@ -120,7 +128,13 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
         showToast(data.error || 'Gagal menyimpan produk', 'error');
         return;
       }
-      showToast(isEdit ? 'Produk berhasil diubah!' : 'Produk berhasil ditambahkan! Jangan lupa isi stok lewat Restock.');
+      showToast(
+        isEdit
+          ? 'Produk berhasil diubah!'
+          : isPakaian
+          ? 'Produk berhasil ditambahkan! Isi stoknya lewat menu Restock.'
+          : 'Produk berhasil ditambahkan!'
+      );
       setNama('');
       setHarga('');
       setStok('');
@@ -131,7 +145,7 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
       if (onProdukDitambahkan) onProdukDitambahkan();
       if (isEdit && onSelesaiEdit) onSelesaiEdit();
     } catch (err) {
-      setMessage('Tidak bisa terhubung ke server');
+      showToast('Tidak bisa terhubung ke server', 'error');
     }
   };
 
@@ -158,21 +172,17 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
 
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <div className="form-group" style={{ flex: 1 }}>
-            <label className="form-label">
-              {isPakaian ? 'Harga Dasar' : 'Harga'}
-            </label>
-            <input className="input" type="number" value={harga} onChange={(e) => setHarga(e.target.value)} required />
+            <label className="form-label">{isPakaian ? 'Harga Dasar' : 'Harga'}</label>
+            <div className="input-prefix-group">
+              <span className="input-prefix">Rp</span>
+              <input className="input" type="number" value={harga} onChange={(e) => setHarga(e.target.value)} required />
+            </div>
           </div>
           {!isPakaian && (
             <div className="form-group" style={{ flex: 1 }}>
               <label className="form-label">Stok</label>
               {isEdit ? (
-                <>
-                  <input className="input" value={stok} disabled style={{ background: 'var(--color-bg)' }} />
-                  <p style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', margin: '4px 0 0 0' }}>
-                    Gunakan halaman Restock atau tombol ⚙️ Koreksi di Daftar Produk untuk mengubah stok
-                  </p>
-                </>
+                <input className="input" value={stok} disabled style={{ background: 'var(--color-bg)' }} />
               ) : (
                 <input className="input" type="number" value={stok} onChange={(e) => setStok(e.target.value)} required />
               )}
@@ -183,6 +193,11 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
             <input className="input" type="number" value={stokMinimum} onChange={(e) => setStokMinimum(e.target.value)} />
           </div>
         </div>
+        {!isPakaian && isEdit && (
+          <p style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '-8px' }}>
+            Gunakan halaman Restock atau tombol ⚙️ Koreksi di Daftar Produk untuk mengubah stok
+          </p>
+        )}
 
         {isPakaian &&
           FIELD_ATTRIBUT_PAKAIAN.map((field) => (
@@ -232,7 +247,7 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
             <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.75rem', fontSize: '0.85rem' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <input type="radio" checked={modeHarga === 'sama'} onChange={() => setModeHarga('sama')} />
-                Sama untuk semua varian (pakai Harga Dasar)
+                Sama untuk semua varian
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <input type="radio" checked={modeHarga === 'berbeda'} onChange={() => setModeHarga('berbeda')} />
@@ -240,7 +255,10 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
               </label>
             </div>
 
-            <label className="form-label">Varian (Ukuran / Warna / Stok{modeHarga === 'berbeda' ? ' / Harga' : ''})</label>
+            <label className="form-label">Varian (Ukuran / Warna{modeHarga === 'berbeda' ? ' / Harga' : ''})</label>
+            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '-4px', marginBottom: '8px' }}>
+              Stok awal semua varian dimulai dari 0 — isi stok sungguhan lewat menu <strong>Restock</strong> setelah produk ini tersimpan.
+            </p>
             {varianList.map((v, index) => (
               <div key={index} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
                 <input
@@ -258,23 +276,22 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
                   style={{ flex: 1 }}
                 />
                 {modeHarga === 'berbeda' && (
-                  <input
-                    className="input"
-                    type="number"
-                    placeholder="Harga"
-                    value={v.harga}
-                    onChange={(e) => handleVarianChange(index, 'harga', e.target.value)}
-                    style={{ width: '100px' }}
-                  />
+                  <div className="input-prefix-group" style={{ width: '130px' }}>
+                    <span className="input-prefix">Rp</span>
+                    <input
+                      className="input"
+                      type="number"
+                      placeholder="Harga"
+                      value={v.harga}
+                      onChange={(e) => handleVarianChange(index, 'harga', e.target.value)}
+                    />
+                  </div>
                 )}
                 {varianList.length > 1 && (
                   <button type="button" className="btn btn-danger btn-sm" onClick={() => hapusBarisVarian(index)}>✕</button>
                 )}
               </div>
             ))}
-            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '8px' }}>
-              Stok awal semua varian dimulai dari 0 — isi stok sungguhan lewat menu <strong>Restock</strong> setelah produk ini tersimpan.
-            </p>
             <button type="button" className="btn btn-secondary btn-sm" onClick={tambahBarisVarian}>
               + Tambah Varian
             </button>
@@ -283,7 +300,7 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
 
         {isPakaian && isEdit && (
           <div className="alert alert-warning">
-            Untuk pakaian, stok & harga per varian diubah lewat tombol <strong>Kelola Varian</strong> di halaman Daftar Produk (bukan lewat form ini).
+            Untuk pakaian, ukuran/warna/harga per varian diubah lewat tombol <strong>Kelola Varian</strong> di halaman Daftar Produk.
           </div>
         )}
 
@@ -298,7 +315,6 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
           )}
         </div>
       </form>
-      {message && <div className="alert alert-success" style={{ marginTop: '1rem' }}>{message}</div>}
     </div>
   );
 }

@@ -27,9 +27,14 @@ const MENU = [
   { key: 'laporan', label: 'Laporan', icon: '📊', roles: ['owner', 'admin'] },
   { key: 'supplier', label: 'Supplier', icon: '🚚', roles: ['owner', 'admin'] },
   { key: 'restock', label: 'Restock', icon: '📥', roles: ['owner', 'admin'] },
-  { key: 'staff', label: 'Kelola Staff', icon: '🧑‍💼', roles: ['owner'] },
+  { key: 'staff', label: 'Kelola Staff', icon: '👔', roles: ['owner'] },
   { key: 'cabang', label: 'Kelola Cabang', icon: '🏬', roles: ['owner'] },
 ];
+
+function bulatkanAngka(nilai) {
+  if (nilai === null || nilai === undefined || nilai === '') return '';
+  return String(Math.round(Number(nilai)));
+}
 
 function totalStokProduk(p) {
   if (p.variants && p.variants.length > 0) {
@@ -50,7 +55,7 @@ function tampilanHargaProduk(p) {
 }
 
 function varianBaruKosong() {
-  return { ukuran: '', warna: '', harga: '' }; // tidak ada 'stok' lagi — selalu mulai dari 0
+  return { ukuran: '', warna: '', harga: '' };
 }
 
 function App() {
@@ -87,7 +92,6 @@ function App() {
     setHalaman('produk');
   };
 
-  // Dipanggil setiap kali pindah menu di sidebar — membersihkan panel yang mungkin masih terbuka
   const pindahHalaman = (key) => {
     if (key === 'tambah') setProdukDiedit(null);
     setProdukDiperluas(null);
@@ -122,7 +126,7 @@ function App() {
         return;
       }
       showToast('Produk berhasil dihapus');
-      muatProduk();
+      setProducts((prev) => prev.filter((p) => p.id !== id));
       muatProdukMenipis();
     } catch (err) {
       showToast('Tidak bisa terhubung ke server', 'error');
@@ -137,7 +141,7 @@ function App() {
     setProdukDiperluas(produk.id);
     const initial = {};
     for (const v of produk.variants) {
-      initial[v.id] = { harga: v.harga != null ? String(v.harga) : '', ukuran: v.ukuran || '', warna: v.warna || '' };
+      initial[v.id] = { harga: bulatkanAngka(v.harga), ukuran: v.ukuran || '', warna: v.warna || '' };
     }
     setEditVarianValues(initial);
     setFormVarianBaru(varianBaruKosong());
@@ -148,6 +152,20 @@ function App() {
       ...prev,
       [variantId]: { ...prev[variantId], [field]: value },
     }));
+  };
+
+  // Update langsung dari respons server — tidak menunggu refetch, supaya tidak ada jeda tampilan
+  const perbaruiVarianDiState = (produkId, variantBaru) => {
+    setProducts((prev) =>
+      prev.map((p) => {
+        if (p.id !== produkId) return p;
+        const sudahAda = p.variants.some((v) => v.id === variantBaru.id);
+        const variantsBaru = sudahAda
+          ? p.variants.map((v) => (v.id === variantBaru.id ? variantBaru : v))
+          : [...p.variants, variantBaru];
+        return { ...p, variants: variantsBaru };
+      })
+    );
   };
 
   const simpanVarian = async (produk, variant) => {
@@ -161,7 +179,7 @@ function App() {
         body: JSON.stringify({
           ukuran: nilai.ukuran,
           warna: nilai.warna,
-          stok: variant.stok, // tidak berubah, stok memang tidak diedit di sini
+          stok: variant.stok,
           harga: nilai.harga && nilai.harga.trim() !== '' ? Number(nilai.harga) : null,
         }),
       });
@@ -173,7 +191,7 @@ function App() {
       }
 
       showToast('Varian berhasil diperbarui!');
-      muatProduk();
+      perbaruiVarianDiState(produk.id, data);
       muatProdukMenipis();
     } catch (err) {
       showToast('Tidak bisa terhubung ke server', 'error');
@@ -195,7 +213,7 @@ function App() {
         body: JSON.stringify({
           ukuran: formVarianBaru.ukuran,
           warna: formVarianBaru.warna,
-          stok: 0, // selalu mulai dari 0 — isi stoknya lewat Restock setelah ini
+          stok: 0,
           harga: formVarianBaru.harga && formVarianBaru.harga.trim() !== '' ? Number(formVarianBaru.harga) : null,
         }),
       });
@@ -205,8 +223,8 @@ function App() {
         return;
       }
       showToast('Varian baru ditambahkan! Isi stoknya lewat menu Restock.');
+      perbaruiVarianDiState(produk.id, data);
       setFormVarianBaru(varianBaruKosong());
-      muatProduk();
       muatProdukMenipis();
     } catch (err) {
       showToast('Tidak bisa terhubung ke server', 'error');
@@ -400,7 +418,7 @@ function App() {
                                   </p>
                                   <table className="data-table" style={{ marginTop: '0.5rem' }}>
                                     <thead>
-                                      <tr><th>Ukuran</th><th>Warna</th><th>Stok</th><th>Harga (kosongkan = ikut harga dasar)</th><th style={{ minWidth: '200px' }}></th></tr>
+                                      <tr><th>Ukuran</th><th>Warna</th><th>Stok</th><th>Harga</th><th style={{ minWidth: '200px' }}></th></tr>
                                     </thead>
                                     <tbody>
                                       {p.variants.map((v) => {
@@ -425,14 +443,16 @@ function App() {
                                             </td>
                                             <td style={{ fontFamily: 'var(--font-mono)' }}>{v.stok}</td>
                                             <td>
-                                              <input
-                                                className="input"
-                                                type="number"
-                                                style={{ width: '100px' }}
-                                                placeholder={`Rp ${Number(p.harga).toLocaleString('id-ID')}`}
-                                                value={editVarianValues[v.id]?.harga ?? ''}
-                                                onChange={(e) => ubahNilaiVarian(v.id, 'harga', e.target.value)}
-                                              />
+                                              <div className="input-prefix-group" style={{ width: '130px' }}>
+                                                <span className="input-prefix">Rp</span>
+                                                <input
+                                                  className="input"
+                                                  type="number"
+                                                  placeholder={bulatkanAngka(p.harga)}
+                                                  value={editVarianValues[v.id]?.harga ?? ''}
+                                                  onChange={(e) => ubahNilaiVarian(v.id, 'harga', e.target.value)}
+                                                />
+                                              </div>
                                             </td>
                                             <td>
                                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -491,14 +511,16 @@ function App() {
                                         </td>
                                         <td style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>0 (restock setelahnya)</td>
                                         <td>
-                                          <input
-                                            className="input"
-                                            type="number"
-                                            placeholder={`Rp ${Number(p.harga).toLocaleString('id-ID')}`}
-                                            style={{ width: '100px' }}
-                                            value={formVarianBaru.harga}
-                                            onChange={(e) => setFormVarianBaru((prev) => ({ ...prev, harga: e.target.value }))}
-                                          />
+                                          <div className="input-prefix-group" style={{ width: '130px' }}>
+                                            <span className="input-prefix">Rp</span>
+                                            <input
+                                              className="input"
+                                              type="number"
+                                              placeholder={bulatkanAngka(p.harga)}
+                                              value={formVarianBaru.harga}
+                                              onChange={(e) => setFormVarianBaru((prev) => ({ ...prev, harga: e.target.value }))}
+                                            />
+                                          </div>
                                         </td>
                                         <td>
                                           <button

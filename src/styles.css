@@ -549,3 +549,23 @@ table.data-table {
   from { opacity: 0; transform: translateX(20px); }
   to { opacity: 1; transform: translateX(0); }
 }
+
+.input-prefix-group {
+  display: flex;
+  align-items: stretch;
+}
+.input-prefix-group .input-prefix {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-strong);
+  border-right: none;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.input-prefix-group .input {
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
