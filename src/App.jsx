@@ -11,9 +11,10 @@ import Laporan from './Laporan';
 import Pelanggan from './Pelanggan';
 import KelolaSupplier from './KelolaSupplier';
 import Restock from './Restock';
+import BarcodeLabel from './BarcodeLabel';
+import KoreksiStokModal from './KoreksiStokModal';
 import { API_URL } from './api';
 import { JENIS_PRODUK_PAKAIAN, TARGET_USIA_PAKAIAN, SEGMEN_PAKAIAN } from './kategoriPakaian';
-import BarcodeLabel from './BarcodeLabel';
 
 const MENU = [
   { key: 'produk', label: 'Daftar Produk', icon: '📦', roles: ['owner', 'admin', 'kasir'] },
@@ -66,6 +67,7 @@ function App() {
   const [savingVarianBaru, setSavingVarianBaru] = useState(false);
   const [pesanVarianBaru, setPesanVarianBaru] = useState(null);
   const [barcodeDipilih, setBarcodeDipilih] = useState(null);
+  const [koreksiDipilih, setKoreksiDipilih] = useState(null); // { produkId, variantId, namaTampil, stokSaatIni }
 
   const [filterJenis, setFilterJenis] = useState('');
   const [filterUsia, setFilterUsia] = useState('');
@@ -125,7 +127,7 @@ function App() {
     setProdukDiperluas(produk.id);
     const initial = {};
     for (const v of produk.variants) {
-      initial[v.id] = { stok: String(v.stok), harga: v.harga != null ? String(v.harga) : '' };
+      initial[v.id] = { harga: v.harga != null ? String(v.harga) : '', ukuran: v.ukuran || '', warna: v.warna || '' };
     }
     setEditVarianValues(initial);
     setVariantMessage({});
@@ -140,6 +142,7 @@ function App() {
     }));
   };
 
+  // Sekarang HANYA mengubah ukuran/warna/harga — stok tidak lagi bisa diubah lewat sini
   const simpanVarian = async (produk, variant) => {
     const nilai = editVarianValues[variant.id];
     setSavingVariantId(variant.id);
@@ -150,9 +153,9 @@ function App() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          ukuran: variant.ukuran,
-          warna: variant.warna,
-          stok: Number(nilai.stok),
+          ukuran: nilai.ukuran,
+          warna: nilai.warna,
+          stok: variant.stok, // dikirim tidak berubah, sengaja tidak diedit di sini
           harga: nilai.harga && nilai.harga.trim() !== '' ? Number(nilai.harga) : null,
         }),
       });
@@ -361,22 +364,30 @@ function App() {
                             </td>
                             {(user?.role === 'owner' || user?.role === 'admin') && (
                               <td>
-                                {punyaVarian ? (
+                                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                  {punyaVarian ? (
                                     <button className="btn btn-secondary btn-sm" onClick={() => bukaKelolaVarian(p)}>
                                       {produkDiperluas === p.id ? 'Tutup' : 'Kelola Varian'}
                                     </button>
                                   ) : (
                                     <>
-                                      <button className="btn btn-secondary btn-sm" onClick={() => { setProdukDiedit(p); setHalaman('tambah'); }}>Edit</button>{' '}
+                                      <button className="btn btn-secondary btn-sm" onClick={() => { setProdukDiedit(p); setHalaman('tambah'); }}>Edit</button>
                                       <button
                                         className="btn btn-secondary btn-sm"
                                         onClick={() => setBarcodeDipilih({ kode: p.sku, judul: p.nama, subJudul: `Rp ${Number(p.harga).toLocaleString('id-ID')}` })}
                                       >
                                         🏷️
                                       </button>
+                                      <button
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={() => setKoreksiDipilih({ produkId: p.id, variantId: null, namaTampil: p.nama, stokSaatIni: p.stok })}
+                                      >
+                                        ⚙️ Koreksi
+                                      </button>
                                     </>
-                                  )}{' '}
-                                <button className="btn btn-danger btn-sm" onClick={() => hapusProduk(p.id)}>Hapus</button>
+                                  )}
+                                  <button className="btn btn-danger btn-sm" onClick={() => hapusProduk(p.id)}>Hapus</button>
+                                </div>
                               </td>
                             )}
                           </tr>
@@ -385,9 +396,12 @@ function App() {
                               <td colSpan={6} style={{ background: 'var(--color-bg)' }}>
                                 <div style={{ padding: '0.75rem' }}>
                                   <strong style={{ fontSize: '0.8rem' }}>Varian Produk</strong>
+                                  <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', margin: '4px 0 8px 0' }}>
+                                    Stok di sini hanya bisa ditambah lewat menu <strong>Restock</strong>, atau diperbaiki lewat tombol <strong>⚙️ Koreksi</strong> di tiap baris.
+                                  </p>
                                   <table className="data-table" style={{ marginTop: '0.5rem' }}>
                                     <thead>
-                                      <tr><th>Ukuran</th><th>Warna</th><th>Stok</th><th>Harga (kosongkan = ikut harga dasar)</th><th style={{ minWidth: '160px' }}></th></tr>
+                                      <tr><th>Ukuran</th><th>Warna</th><th>Stok</th><th>Harga (kosongkan = ikut harga dasar)</th><th style={{ minWidth: '220px' }}></th></tr>
                                     </thead>
                                     <tbody>
                                       {p.variants.map((v) => {
@@ -395,17 +409,23 @@ function App() {
                                         const sedangSimpan = savingVariantId === v.id;
                                         return (
                                           <tr key={v.id}>
-                                            <td>{v.ukuran || '-'}</td>
-                                            <td>{v.warna || '-'}</td>
                                             <td>
                                               <input
                                                 className="input"
-                                                type="number"
-                                                style={{ width: '80px' }}
-                                                value={editVarianValues[v.id]?.stok ?? ''}
-                                                onChange={(e) => ubahNilaiVarian(v.id, 'stok', e.target.value)}
+                                                style={{ width: '70px' }}
+                                                value={editVarianValues[v.id]?.ukuran ?? ''}
+                                                onChange={(e) => ubahNilaiVarian(v.id, 'ukuran', e.target.value)}
                                               />
                                             </td>
+                                            <td>
+                                              <input
+                                                className="input"
+                                                style={{ width: '90px' }}
+                                                value={editVarianValues[v.id]?.warna ?? ''}
+                                                onChange={(e) => ubahNilaiVarian(v.id, 'warna', e.target.value)}
+                                              />
+                                            </td>
+                                            <td style={{ fontFamily: 'var(--font-mono)' }}>{v.stok}</td>
                                             <td>
                                               <input
                                                 className="input"
@@ -417,27 +437,38 @@ function App() {
                                               />
                                             </td>
                                             <td>
-                                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                              <button
-                                                className="btn btn-secondary btn-sm"
-                                                onClick={() => setBarcodeDipilih({
-                                                  kode: v.sku,
-                                                  judul: p.nama,
-                                                  subJudul: `${[v.ukuran, v.warna].filter(Boolean).join('/')} · Rp ${Number(v.harga ?? p.harga).toLocaleString('id-ID')}`,
-                                                })}
-                                              >
-                                                🏷️
-                                              </button>
-                                              <button
-                                                className="btn btn-primary btn-sm"
-                                                disabled={sedangSimpan}
-                                                onClick={() => simpanVarian(p, v)}
-                                              >
-                                                {sedangSimpan ? 'Menyimpan...' : 'Simpan'}
-                                              </button>
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                                <button
+                                                  className="btn btn-secondary btn-sm"
+                                                  onClick={() => setBarcodeDipilih({
+                                                    kode: v.sku,
+                                                    judul: p.nama,
+                                                    subJudul: `${[v.ukuran, v.warna].filter(Boolean).join('/')} · Rp ${Number(v.harga ?? p.harga).toLocaleString('id-ID')}`,
+                                                  })}
+                                                >
+                                                  🏷️
+                                                </button>
+                                                <button
+                                                  className="btn btn-secondary btn-sm"
+                                                  onClick={() => setKoreksiDipilih({
+                                                    produkId: p.id,
+                                                    variantId: v.id,
+                                                    namaTampil: `${p.nama} (${[v.ukuran, v.warna].filter(Boolean).join('/')})`,
+                                                    stokSaatIni: v.stok,
+                                                  })}
+                                                >
+                                                  ⚙️
+                                                </button>
+                                                <button
+                                                  className="btn btn-primary btn-sm"
+                                                  disabled={sedangSimpan}
+                                                  onClick={() => simpanVarian(p, v)}
+                                                >
+                                                  {sedangSimpan ? 'Menyimpan...' : 'Simpan'}
+                                                </button>
                                                 {pesan && (
-                                                  <span style={{ fontSize: '0.78rem', color: pesan.tipe === 'sukses' ? 'var(--color-success)' : 'var(--color-danger)' }}>
-                                                    {pesan.tipe === 'sukses' ? '✓ ' : '✕ '}{pesan.teks}
+                                                  <span style={{ fontSize: '0.75rem', color: pesan.tipe === 'sukses' ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                                                    {pesan.tipe === 'sukses' ? '✓' : '✕'} {pesan.teks}
                                                   </span>
                                                 )}
                                               </div>
@@ -446,13 +477,12 @@ function App() {
                                         );
                                       })}
 
-                                      {/* Baris form tambah varian baru */}
                                       <tr style={{ background: 'var(--color-surface)' }}>
                                         <td>
                                           <input
                                             className="input"
                                             placeholder="Ukuran"
-                                            style={{ width: '80px' }}
+                                            style={{ width: '70px' }}
                                             value={formVarianBaru.ukuran}
                                             onChange={(e) => setFormVarianBaru((prev) => ({ ...prev, ukuran: e.target.value }))}
                                           />
@@ -470,7 +500,7 @@ function App() {
                                           <input
                                             className="input"
                                             type="number"
-                                            placeholder="Stok"
+                                            placeholder="Stok awal"
                                             style={{ width: '80px' }}
                                             value={formVarianBaru.stok}
                                             onChange={(e) => setFormVarianBaru((prev) => ({ ...prev, stok: e.target.value }))}
@@ -493,11 +523,11 @@ function App() {
                                               disabled={savingVarianBaru}
                                               onClick={() => tambahVarianBaru(p)}
                                             >
-                                              {savingVarianBaru ? 'Menambah...' : '+ Tambah Varian'}
+                                              {savingVarianBaru ? 'Menambah...' : '+ Tambah Varian Baru'}
                                             </button>
                                             {pesanVarianBaru && (
-                                              <span style={{ fontSize: '0.78rem', color: pesanVarianBaru.tipe === 'sukses' ? 'var(--color-success)' : 'var(--color-danger)' }}>
-                                                {pesanVarianBaru.tipe === 'sukses' ? '✓ ' : '✕ '}{pesanVarianBaru.teks}
+                                              <span style={{ fontSize: '0.75rem', color: pesanVarianBaru.tipe === 'sukses' ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                                                {pesanVarianBaru.tipe === 'sukses' ? '✓' : '✕'} {pesanVarianBaru.teks}
                                               </span>
                                             )}
                                           </div>
@@ -549,12 +579,25 @@ function App() {
           {halaman === 'pelanggan' && <Pelanggan token={token} />}
         </main>
       </div>
+
       {barcodeDipilih && (
         <BarcodeLabel
           kode={barcodeDipilih.kode}
           judul={barcodeDipilih.judul}
           subJudul={barcodeDipilih.subJudul}
           onTutup={() => setBarcodeDipilih(null)}
+        />
+      )}
+
+      {koreksiDipilih && (
+        <KoreksiStokModal
+          token={token}
+          produkId={koreksiDipilih.produkId}
+          variantId={koreksiDipilih.variantId}
+          namaTampil={koreksiDipilih.namaTampil}
+          stokSaatIni={koreksiDipilih.stokSaatIni}
+          onTutup={() => setKoreksiDipilih(null)}
+          onSukses={() => { muatProduk(); muatProdukMenipis(); }}
         />
       )}
     </div>

@@ -170,7 +170,16 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
           {!isPakaian && (
             <div className="form-group" style={{ flex: 1 }}>
               <label className="form-label">Stok</label>
-              <input className="input" type="number" value={stok} onChange={(e) => setStok(e.target.value)} required />
+              {isEdit ? (
+                <>
+                  <input className="input" value={stok} disabled style={{ background: 'var(--color-bg)' }} />
+                  <p style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', margin: '4px 0 0 0' }}>
+                    Gunakan halaman Restock atau tombol ⚙️ Koreksi di Daftar Produk untuk mengubah stok
+                  </p>
+                </>
+              ) : (
+                <input className="input" type="number" value={stok} onChange={(e) => setStok(e.target.value)} required />
+              )}
             </div>
           )}
           <div className="form-group" style={{ flex: 1 }}>

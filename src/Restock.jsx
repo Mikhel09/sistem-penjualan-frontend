@@ -6,6 +6,7 @@ function Restock({ token, storeIdUser }) {
   const [supplierList, setSupplierList] = useState([]);
   const [riwayat, setRiwayat] = useState([]);
   const [productId, setProductId] = useState('');
+  const [variantId, setVariantId] = useState('');
   const [supplierId, setSupplierId] = useState('');
   const [qty, setQty] = useState('');
   const [hargaBeli, setHargaBeli] = useState('');
@@ -27,15 +28,25 @@ function Restock({ token, storeIdUser }) {
     muatData();
   }, []);
 
+  const produkDipilih = products.find((p) => p.id === Number(productId));
+  const punyaVarian = produkDipilih?.variants && produkDipilih.variants.length > 0;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
+
+    if (punyaVarian && !variantId) {
+      setMessage('Pilih varian (ukuran/warna) yang mau di-restock');
+      return;
+    }
+
     try {
       const res = await fetch(`${API_URL}/api/purchases`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           product_id: Number(productId),
+          variant_id: punyaVarian ? Number(variantId) : undefined,
           supplier_id: supplierId ? Number(supplierId) : null,
           qty: Number(qty),
           harga_beli: Number(hargaBeli),
@@ -48,6 +59,7 @@ function Restock({ token, storeIdUser }) {
       }
       setMessage('Restock berhasil dicatat, stok otomatis bertambah!');
       setProductId('');
+      setVariantId('');
       setSupplierId('');
       setQty('');
       setHargaBeli('');
@@ -62,18 +74,44 @@ function Restock({ token, storeIdUser }) {
 
   return (
     <div>
-      <div className="card" style={{ maxWidth: '420px' }}>
+      <div className="card" style={{ maxWidth: '440px' }}>
         <h2 className="card-title">Catat Restock Barang</h2>
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label className="form-label">Produk</label>
-            <select className="input" value={productId} onChange={(e) => setProductId(e.target.value)} required>
+            <select
+              className="input"
+              value={productId}
+              onChange={(e) => { setProductId(e.target.value); setVariantId(''); }}
+              required
+            >
               <option value="">-- Pilih Produk --</option>
               {products.map((p) => (
-                <option key={p.id} value={p.id}>{p.nama} (stok saat ini: {p.stok})</option>
+                <option key={p.id} value={p.id}>{p.nama}</option>
               ))}
             </select>
           </div>
+
+          {punyaVarian && (
+            <div className="form-group">
+              <label className="form-label">Varian (Ukuran/Warna)</label>
+              <select className="input" value={variantId} onChange={(e) => setVariantId(e.target.value)} required>
+                <option value="">-- Pilih Varian --</option>
+                {produkDipilih.variants.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {[v.ukuran, v.warna].filter(Boolean).join(' / ') || 'Default'} (stok saat ini: {v.stok})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {productId && !punyaVarian && produkDipilih && (
+            <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '-8px' }}>
+              Stok saat ini: {produkDipilih.stok}
+            </p>
+          )}
+
           <div className="form-group">
             <label className="form-label">Supplier (opsional)</label>
             <select className="input" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
@@ -103,13 +141,14 @@ function Restock({ token, storeIdUser }) {
         <div className="table-wrap">
           <table className="data-table">
             <thead>
-              <tr><th>Tanggal</th><th>Produk</th><th>Supplier</th><th>Qty</th><th>Harga Beli</th><th>Total</th></tr>
+              <tr><th>Tanggal</th><th>Produk</th><th>Varian</th><th>Supplier</th><th>Qty</th><th>Harga Beli</th><th>Total</th></tr>
             </thead>
             <tbody>
               {riwayat.map((r) => (
                 <tr key={r.id}>
                   <td>{formatTanggal(r.created_at)}</td>
                   <td>{r.nama_produk}</td>
+                  <td>{[r.ukuran, r.warna].filter(Boolean).join('/') || '-'}</td>
                   <td>{r.nama_supplier || '-'}</td>
                   <td className="num">{r.qty}</td>
                   <td className="num">Rp {Number(r.harga_beli).toLocaleString('id-ID')}</td>
