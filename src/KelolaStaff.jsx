@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { API_URL } from './api';
+import { showToast } from './toast';
 
 function KelolaStaff({ token }) {
   const [staffList, setStaffList] = useState([]);
@@ -9,12 +10,20 @@ function KelolaStaff({ token }) {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('kasir');
   const [storeId, setStoreId] = useState('');
-  const [message, setMessage] = useState('');
+  const [pindahCabangValues, setPindahCabangValues] = useState({}); // { [staffId]: storeIdTujuan }
+  const [savingPindahId, setSavingPindahId] = useState(null);
 
   const muatStaff = () => {
     fetch(`${API_URL}/api/users`, { headers: { Authorization: `Bearer ${token}` } })
       .then((res) => res.json())
-      .then(setStaffList);
+      .then((data) => {
+        setStaffList(data);
+        const initial = {};
+        for (const s of data) {
+          if (s.role !== 'owner') initial[s.id] = String(s.store_id || '');
+        }
+        setPindahCabangValues(initial);
+      });
   };
 
   const muatCabang = () => {
@@ -30,9 +39,8 @@ function KelolaStaff({ token }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage('');
     if (!storeId) {
-      setMessage('Pilih cabang untuk staff ini');
+      showToast('Pilih cabang untuk staff ini', 'error');
       return;
     }
     try {
@@ -43,17 +51,44 @@ function KelolaStaff({ token }) {
       });
       const data = await res.json();
       if (!res.ok) {
-        setMessage(data.error || 'Gagal menambah staff');
+        showToast(data.error || 'Gagal menambah staff', 'error');
         return;
       }
-      setMessage('Staff berhasil ditambahkan!');
+      showToast('Staff berhasil ditambahkan!');
       setNama('');
       setEmail('');
       setPassword('');
       setStoreId('');
       muatStaff();
     } catch (err) {
-      setMessage('Tidak bisa terhubung ke server');
+      showToast('Tidak bisa terhubung ke server', 'error');
+    }
+  };
+
+  const pindahkanCabang = async (staff) => {
+    const tujuan = pindahCabangValues[staff.id];
+    if (!tujuan || Number(tujuan) === staff.store_id) {
+      showToast('Pilih cabang yang berbeda dari cabang saat ini', 'error');
+      return;
+    }
+    setSavingPindahId(staff.id);
+    try {
+      const res = await fetch(`${API_URL}/api/users/${staff.id}/cabang`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ store_id: Number(tujuan) }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Gagal memindahkan cabang', 'error');
+        return;
+      }
+      showToast(`${staff.nama} berhasil dipindahkan ke cabang baru!`);
+      muatStaff();
+    } catch (err) {
+      showToast('Tidak bisa terhubung ke server', 'error');
+    } finally {
+      setSavingPindahId(null);
     }
   };
 
@@ -94,14 +129,13 @@ function KelolaStaff({ token }) {
           </div>
           <button type="submit" className="btn btn-primary">Tambah Staff</button>
         </form>
-        {message && <div className="alert alert-success" style={{ marginTop: '1rem' }}>{message}</div>}
       </div>
 
       <div className="card">
         <h2 className="card-title">Daftar Staff</h2>
         <div className="table-wrap">
           <table className="data-table">
-            <thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Cabang</th></tr></thead>
+            <thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Cabang Saat Ini</th><th style={{ minWidth: '260px' }}>Pindah Cabang</th></tr></thead>
             <tbody>
               {staffList.map((s) => (
                 <tr key={s.id}>
@@ -109,6 +143,31 @@ function KelolaStaff({ token }) {
                   <td>{s.email}</td>
                   <td><span className={`badge badge-${s.role}`}>{s.role}</span></td>
                   <td>{s.nama_toko || '-'}</td>
+                  <td>
+                    {s.role === 'owner' ? (
+                      <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>Owner akses semua cabang</span>
+                    ) : (
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <select
+                          className="input"
+                          style={{ width: 'auto' }}
+                          value={pindahCabangValues[s.id] || ''}
+                          onChange={(e) => setPindahCabangValues((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                        >
+                          {cabangList.map((c) => (
+                            <option key={c.id} value={c.id}>{c.nama_toko}</option>
+                          ))}
+                        </select>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          disabled={savingPindahId === s.id}
+                          onClick={() => pindahkanCabang(s)}
+                        >
+                          {savingPindahId === s.id ? 'Memindahkan...' : 'Pindahkan'}
+                        </button>
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
