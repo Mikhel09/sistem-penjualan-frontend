@@ -101,10 +101,13 @@ function App() {
   };
 
   const muatProduk = () => {
-    fetch(`${API_URL}/api/products`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((res) => res.json())
-      .then(setProducts);
-  };
+  fetch(`${API_URL}/api/products`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  })
+    .then((res) => res.json())
+    .then(setProducts);
+};
 
   const muatProdukMenipis = () => {
     fetch(`${API_URL}/api/products/stok-menipis/list`, { headers: { Authorization: `Bearer ${token}` } })
@@ -191,7 +194,11 @@ function App() {
       }
 
       showToast('Varian berhasil diperbarui!');
-      perbaruiVarianDiState(produk.id, data);
+      const produkTerbaru = await fetch(`${API_URL}/api/products`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
+      }).then((r) => r.json());
+      setProducts(produkTerbaru);
       muatProdukMenipis();
     } catch (err) {
       showToast('Tidak bisa terhubung ke server', 'error');
@@ -223,7 +230,11 @@ function App() {
         return;
       }
       showToast('Varian baru ditambahkan! Isi stoknya lewat menu Restock.');
-      perbaruiVarianDiState(produk.id, data);
+      const produkTerbaru = await fetch(`${API_URL}/api/products`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
+      }).then((r) => r.json());
+      setProducts(produkTerbaru);
       setFormVarianBaru(varianBaruKosong());
       muatProdukMenipis();
     } catch (err) {

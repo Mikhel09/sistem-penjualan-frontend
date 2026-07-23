@@ -40,13 +40,13 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
     }
   }, []);
 
-  const muatProdukKasir = () => {
-    if (!storeIdAktif) return;
-    const url = storeIdUser ? `${API_URL}/api/products` : `${API_URL}/api/products?store_id=${storeIdAktif}`;
-    fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-      .then((res) => res.json())
-      .then(setProducts);
-  };
+ const muatProdukKasir = () => {
+  if (!storeIdAktif) return;
+  const url = storeIdUser ? `${API_URL}/api/products` : `${API_URL}/api/products?store_id=${storeIdAktif}`;
+  fetch(url, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
+    .then((res) => res.json())
+    .then(setProducts);
+};
 
   useEffect(() => {
     muatProdukKasir();
