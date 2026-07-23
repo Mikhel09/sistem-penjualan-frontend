@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { API_URL } from './api';
 
-function Restock({ token, storeIdUser, onRestockBerhasil }) {
+function Restock({ token, storeIdUser }) {
   const [cabangList, setCabangList] = useState([]);
   const [storeIdDipilih, setStoreIdDipilih] = useState('');
   const [products, setProducts] = useState([]);
@@ -88,11 +88,10 @@ function Restock({ token, storeIdUser, onRestockBerhasil }) {
       setHargaBeli('');
 
       const url = storeIdUser ? `${API_URL}/api/products` : `${API_URL}/api/products?store_id=${storeIdAktif}`;
-      fetch(url, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
+      fetch(url, { headers: { Authorization: `Bearer ${token}` } })
         .then((r) => r.json())
         .then(setProducts);
       muatRiwayat();
-      if (onRestockBerhasil) onRestockBerhasil();
     } catch (err) {
       setMessage('Tidak bisa terhubung ke server');
     }
