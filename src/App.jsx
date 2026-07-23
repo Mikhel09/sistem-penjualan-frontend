@@ -93,12 +93,14 @@ function App() {
   };
 
   const pindahHalaman = (key) => {
-    if (key === 'tambah') setProdukDiedit(null);
-    setProdukDiperluas(null);
-    setEditVarianValues({});
-    setFormVarianBaru(varianBaruKosong());
-    setHalaman(key);
-  };
+  if (key === 'tambah') setProdukDiedit(null);
+  setProdukDiperluas(null);
+  setEditVarianValues({});
+  setFormVarianBaru(varianBaruKosong());
+  setHalaman(key);
+  muatProduk();
+  muatProdukMenipis();
+};
 
   const muatProduk = () => {
   fetch(`${API_URL}/api/products`, {
@@ -598,8 +600,13 @@ function App() {
 
           {halaman === 'supplier' && <KelolaSupplier token={token} />}
 
-          {halaman === 'restock' && <Restock token={token} storeIdUser={user?.store_id} />}
-
+          {halaman === 'restock' && (
+            <Restock
+              token={token}
+              storeIdUser={user?.store_id}
+              onRestockBerhasil={() => { muatProduk(); muatProdukMenipis(); }}
+            />
+          )}
           {halaman === 'staff' && <KelolaStaff token={token} />}
 
           {halaman === 'cabang' && <KelolaCabang token={token} />}
