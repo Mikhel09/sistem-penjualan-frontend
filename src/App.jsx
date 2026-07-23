@@ -199,6 +199,15 @@ function App() {
         cache: 'no-store',
       }).then((r) => r.json());
       setProducts(produkTerbaru);
+
+      const produkTerbaruItem = produkTerbaru.find((pr) => pr.id === produk.id);
+      if (produkTerbaruItem) {
+        const initial = {};
+        for (const v of produkTerbaruItem.variants) {
+          initial[v.id] = { harga: bulatkanAngka(v.harga), ukuran: v.ukuran || '', warna: v.warna || '' };
+        }
+        setEditVarianValues(initial);
+      }
       muatProdukMenipis();
     } catch (err) {
       showToast('Tidak bisa terhubung ke server', 'error');
@@ -235,6 +244,15 @@ function App() {
         cache: 'no-store',
       }).then((r) => r.json());
       setProducts(produkTerbaru);
+
+      const produkTerbaruItem = produkTerbaru.find((pr) => pr.id === produk.id);
+      if (produkTerbaruItem) {
+        const initial = {};
+        for (const v of produkTerbaruItem.variants) {
+          initial[v.id] = { harga: bulatkanAngka(v.harga), ukuran: v.ukuran || '', warna: v.warna || '' };
+        }
+        setEditVarianValues(initial);
+      }
       setFormVarianBaru(varianBaruKosong());
       muatProdukMenipis();
     } catch (err) {
