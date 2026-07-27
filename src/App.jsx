@@ -18,6 +18,9 @@ import ToastContainer from './ToastContainer';
 import { showToast } from './toast';
 import { API_URL } from './api';
 import { JENIS_PRODUK_PAKAIAN, TARGET_USIA_PAKAIAN, SEGMEN_PAKAIAN } from './kategoriPakaian';
+import PhotoGalleryModal from './PhotoGalleryModal';
+
+const [galeriDipilih, setGaleriDipilih] = useState(null); // { fotos, judul }
 
 const MENU = [
   { key: 'produk', label: 'Daftar Produk', icon: '📦', roles: ['owner', 'admin', 'kasir'] },
@@ -247,9 +250,13 @@ function App() {
                   const punyaVarian = p.variants && p.variants.length > 0;
                   return (
                     <div key={p.id} className="product-card">
-                      <div className="product-card-photo">
-                        {p.foto ? <img src={p.foto} alt={p.nama} /> : ICON_KATEGORI[user?.jenis_usaha] || '📦'}
-                      </div>
+                      <div
+                      className="product-card-photo"
+                      onClick={() => p.fotos && p.fotos.length > 0 && setGaleriDipilih({ fotos: p.fotos, judul: p.nama })}
+                    >
+                      {p.fotos && p.fotos.length > 0 ? <img src={p.fotos[0]} alt={p.nama} /> : ICON_KATEGORI[user?.jenis_usaha] || '📦'}
+                      {p.fotos && p.fotos.length > 1 && <span className="product-card-photo-badge">+{p.fotos.length - 1}</span>}
+                    </div>
                       <div className="product-card-body">
                         <div className="product-card-name">{p.nama}</div>
                         <div className="product-card-price">{tampilanHargaProduk(p)}</div>
@@ -328,15 +335,16 @@ function App() {
       </div>
 
       {varianModalProduk && (
-        <VarianModal
-          token={token}
-          produk={varianModalProduk}
-          onTutup={() => setVarianModalProduk(null)}
-          onBerubah={() => { muatProduk(); muatProdukMenipis(); }}
-          onBukaBarcode={setBarcodeDipilih}
-          onBukaKoreksi={setKoreksiDipilih}
-        />
-      )}
+          <VarianModal
+            token={token}
+            produk={varianModalProduk}
+            onTutup={() => setVarianModalProduk(null)}
+            onBerubah={() => { muatProduk(); muatProdukMenipis(); }}
+            onBukaBarcode={setBarcodeDipilih}
+            onBukaKoreksi={setKoreksiDipilih}
+            onLihatGaleri={setGaleriDipilih}
+          />
+        )}
 
       {barcodeDipilih && (
         <BarcodeLabel
@@ -356,6 +364,14 @@ function App() {
           stokSaatIni={koreksiDipilih.stokSaatIni}
           onTutup={() => setKoreksiDipilih(null)}
           onSukses={() => { muatProduk(); muatProdukMenipis(); showToast('Koreksi stok berhasil disimpan!'); }}
+        />
+      )}
+
+      {galeriDipilih && (
+        <PhotoGalleryModal
+          fotos={galeriDipilih.fotos}
+          judul={galeriDipilih.judul}
+          onTutup={() => setGaleriDipilih(null)}
         />
       )}
     </div>
