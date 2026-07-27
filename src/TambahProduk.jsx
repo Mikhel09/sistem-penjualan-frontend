@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { API_URL } from './api';
 import { showToast } from './toast';
+import { resizeGambar } from './imageUtils';
 import { JENIS_PRODUK_PAKAIAN, TARGET_USIA_PAKAIAN, SEGMEN_PAKAIAN } from './kategoriPakaian';
 
 const FIELD_ATTRIBUT_PAKAIAN = [
@@ -35,6 +36,7 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
   const [stok, setStok] = useState('');
   const [stokMinimum, setStokMinimum] = useState('5');
   const [attrValues, setAttrValues] = useState({});
+  const [foto, setFoto] = useState(null);
   const [modeHarga, setModeHarga] = useState('sama');
   const [varianList, setVarianList] = useState([buatVarianKosong()]);
   const [cabangList, setCabangList] = useState([]);
@@ -60,12 +62,14 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
       setStok(bulatkanAngka(produkDiedit.stok));
       setStokMinimum(bulatkanAngka(produkDiedit.stok_minimum) || '5');
       setAttrValues(produkDiedit.attributes || {});
+      setFoto(produkDiedit.foto || null);
     } else {
       setNama('');
       setHarga('');
       setStok('');
       setStokMinimum('5');
       setAttrValues({});
+      setFoto(null);
       setModeHarga('sama');
       setVarianList([buatVarianKosong()]);
     }
@@ -73,6 +77,17 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
 
   const handleAttrChange = (key, value) => {
     setAttrValues((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleFotoChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const dataUrl = await resizeGambar(file, 500);
+      setFoto(dataUrl);
+    } catch (err) {
+      showToast('Gagal memproses foto', 'error');
+    }
   };
 
   const handleVarianChange = (index, field, value) => {
@@ -99,6 +114,7 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
       stok_minimum: Number(stokMinimum),
       attributes: attrValues,
       store_id: storeIdUser || Number(storeIdDipilih),
+      foto: foto || null,
     };
 
     if (isPakaian && !isEdit) {
@@ -140,6 +156,7 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
       setStok('');
       setStokMinimum('5');
       setAttrValues({});
+      setFoto(null);
       setModeHarga('sama');
       setVarianList([buatVarianKosong()]);
       if (onProdukDitambahkan) onProdukDitambahkan();
@@ -153,6 +170,23 @@ function TambahProduk({ token, jenisUsaha, storeIdUser, onProdukDitambahkan, pro
     <div className="card" style={{ maxWidth: '600px' }}>
       <h2 className="card-title">{isEdit ? 'Edit Produk' : 'Tambah Produk'} · <span className={`badge badge-${jenisUsaha}`}>{jenisUsaha}</span></h2>
       <form onSubmit={handleSubmit}>
+        <div className="form-group">
+          <label className="form-label">Foto Produk (opsional)</label>
+          <label className="photo-upload-box">
+            {foto ? (
+              <img src={foto} alt="Preview" />
+            ) : (
+              <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>📷 Klik untuk pilih foto</span>
+            )}
+            <input type="file" accept="image/*" onChange={handleFotoChange} />
+          </label>
+          {foto && (
+            <button type="button" className="btn btn-secondary btn-sm" style={{ marginTop: '6px' }} onClick={() => setFoto(null)}>
+              Hapus Foto
+            </button>
+          )}
+        </div>
+
         {butuhPilihCabang && !isEdit && (
           <div className="form-group">
             <label className="form-label">Cabang</label>

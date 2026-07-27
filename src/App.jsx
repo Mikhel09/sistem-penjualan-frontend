@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect } from 'react';
 import Login from './Login';
 import LupaPassword from './LupaPassword';
 import ResetPassword from './ResetPassword';
@@ -13,6 +13,7 @@ import KelolaSupplier from './KelolaSupplier';
 import Restock from './Restock';
 import BarcodeLabel from './BarcodeLabel';
 import KoreksiStokModal from './KoreksiStokModal';
+import VarianModal from './VarianModal';
 import ToastContainer from './ToastContainer';
 import { showToast } from './toast';
 import { API_URL } from './api';
@@ -20,26 +21,21 @@ import { JENIS_PRODUK_PAKAIAN, TARGET_USIA_PAKAIAN, SEGMEN_PAKAIAN } from './kat
 
 const MENU = [
   { key: 'produk', label: 'Daftar Produk', icon: '📦', roles: ['owner', 'admin', 'kasir'] },
-  { key: 'tambah', label: 'Tambah Produk', icon: '➕', roles: ['owner', 'admin'] },
+  { key: 'tambah', label: 'Tambah Produk', icon: '➕', roles: ['owner', 'admin'], perm: 'kelola_produk' },
   { key: 'kasir', label: 'Kasir', icon: '🧾', roles: ['owner', 'admin', 'kasir'] },
   { key: 'riwayat', label: 'Riwayat Transaksi', icon: '🕒', roles: ['owner', 'admin', 'kasir'] },
   { key: 'pelanggan', label: 'Pelanggan', icon: '👤', roles: ['owner', 'admin', 'kasir'] },
-  { key: 'laporan', label: 'Laporan', icon: '📊', roles: ['owner', 'admin'] },
-  { key: 'supplier', label: 'Supplier', icon: '🚚', roles: ['owner', 'admin'] },
-  { key: 'restock', label: 'Restock', icon: '📥', roles: ['owner', 'admin'] },
+  { key: 'laporan', label: 'Laporan', icon: '📊', roles: ['owner', 'admin'], perm: 'lihat_laporan' },
+  { key: 'supplier', label: 'Supplier', icon: '🚚', roles: ['owner', 'admin'], perm: 'kelola_stok' },
+  { key: 'restock', label: 'Restock', icon: '📥', roles: ['owner', 'admin'], perm: 'kelola_stok' },
   { key: 'staff', label: 'Kelola Staff', icon: '👔', roles: ['owner'] },
   { key: 'cabang', label: 'Kelola Cabang', icon: '🏬', roles: ['owner'] },
 ];
 
-function bulatkanAngka(nilai) {
-  if (nilai === null || nilai === undefined || nilai === '') return '';
-  return String(Math.round(Number(nilai)));
-}
+const ICON_KATEGORI = { pakaian: '👕', makanan_minuman: '🍔', supermarket: '🛒' };
 
 function totalStokProduk(p) {
-  if (p.variants && p.variants.length > 0) {
-    return p.variants.reduce((sum, v) => sum + v.stok, 0);
-  }
+  if (p.variants && p.variants.length > 0) return p.variants.reduce((sum, v) => sum + v.stok, 0);
   return p.stok;
 }
 
@@ -54,10 +50,6 @@ function tampilanHargaProduk(p) {
   return `Rp ${Number(p.harga).toLocaleString('id-ID')}`;
 }
 
-function varianBaruKosong() {
-  return { ukuran: '', warna: '', harga: '' };
-}
-
 function App() {
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
@@ -66,11 +58,7 @@ function App() {
   const [halaman, setHalaman] = useState('produk');
   const [produkDiedit, setProdukDiedit] = useState(null);
   const [tampilanAuth, setTampilanAuth] = useState('login');
-  const [produkDiperluas, setProdukDiperluas] = useState(null);
-  const [editVarianValues, setEditVarianValues] = useState({});
-  const [savingVariantId, setSavingVariantId] = useState(null);
-  const [formVarianBaru, setFormVarianBaru] = useState(varianBaruKosong());
-  const [savingVarianBaru, setSavingVarianBaru] = useState(false);
+  const [varianModalProduk, setVarianModalProduk] = useState(null);
   const [barcodeDipilih, setBarcodeDipilih] = useState(null);
   const [koreksiDipilih, setKoreksiDipilih] = useState(null);
 
@@ -94,20 +82,15 @@ function App() {
 
   const pindahHalaman = (key) => {
     if (key === 'tambah') setProdukDiedit(null);
-    setProdukDiperluas(null);
-    setEditVarianValues({});
-    setFormVarianBaru(varianBaruKosong());
+    setVarianModalProduk(null);
     setHalaman(key);
   };
 
   const muatProduk = () => {
-  fetch(`${API_URL}/api/products`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
-  })
-    .then((res) => res.json())
-    .then(setProducts);
-};
+    fetch(`${API_URL}/api/products`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
+      .then((res) => res.json())
+      .then(setProducts);
+  };
 
   const muatProdukMenipis = () => {
     fetch(`${API_URL}/api/products/stok-menipis/list`, { headers: { Authorization: `Bearer ${token}` } })
@@ -136,132 +119,6 @@ function App() {
     }
   };
 
-  const bukaKelolaVarian = (produk) => {
-    if (produkDiperluas === produk.id) {
-      setProdukDiperluas(null);
-      return;
-    }
-    setProdukDiperluas(produk.id);
-    const initial = {};
-    for (const v of produk.variants) {
-      initial[v.id] = { harga: bulatkanAngka(v.harga), ukuran: v.ukuran || '', warna: v.warna || '' };
-    }
-    setEditVarianValues(initial);
-    setFormVarianBaru(varianBaruKosong());
-  };
-
-  const ubahNilaiVarian = (variantId, field, value) => {
-    setEditVarianValues((prev) => ({
-      ...prev,
-      [variantId]: { ...prev[variantId], [field]: value },
-    }));
-  };
-
-  // Update langsung dari respons server — tidak menunggu refetch, supaya tidak ada jeda tampilan
-  const perbaruiVarianDiState = (produkId, variantBaru) => {
-    setProducts((prev) =>
-      prev.map((p) => {
-        if (p.id !== produkId) return p;
-        const sudahAda = p.variants.some((v) => v.id === variantBaru.id);
-        const variantsBaru = sudahAda
-          ? p.variants.map((v) => (v.id === variantBaru.id ? variantBaru : v))
-          : [...p.variants, variantBaru];
-        return { ...p, variants: variantsBaru };
-      })
-    );
-  };
-
-  const simpanVarian = async (produk, variant) => {
-    const nilai = editVarianValues[variant.id];
-    setSavingVariantId(variant.id);
-
-    try {
-      const res = await fetch(`${API_URL}/api/products/${produk.id}/variants/${variant.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          ukuran: nilai.ukuran,
-          warna: nilai.warna,
-          stok: variant.stok,
-          harga: nilai.harga && nilai.harga.trim() !== '' ? Number(nilai.harga) : null,
-        }),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        showToast(data.error || 'Gagal menyimpan', 'error');
-        return;
-      }
-
-      showToast('Varian berhasil diperbarui!');
-      const produkTerbaru = await fetch(`${API_URL}/api/products`, {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: 'no-store',
-      }).then((r) => r.json());
-      setProducts(produkTerbaru);
-
-      const produkTerbaruItem = produkTerbaru.find((pr) => pr.id === produk.id);
-      if (produkTerbaruItem) {
-        const initial = {};
-        for (const v of produkTerbaruItem.variants) {
-          initial[v.id] = { harga: bulatkanAngka(v.harga), ukuran: v.ukuran || '', warna: v.warna || '' };
-        }
-        setEditVarianValues(initial);
-      }
-      muatProdukMenipis();
-    } catch (err) {
-      showToast('Tidak bisa terhubung ke server', 'error');
-    } finally {
-      setSavingVariantId(null);
-    }
-  };
-
-  const tambahVarianBaru = async (produk) => {
-    if (!formVarianBaru.ukuran && !formVarianBaru.warna) {
-      showToast('Isi minimal Ukuran atau Warna', 'error');
-      return;
-    }
-    setSavingVarianBaru(true);
-    try {
-      const res = await fetch(`${API_URL}/api/products/${produk.id}/variants`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          ukuran: formVarianBaru.ukuran,
-          warna: formVarianBaru.warna,
-          stok: 0,
-          harga: formVarianBaru.harga && formVarianBaru.harga.trim() !== '' ? Number(formVarianBaru.harga) : null,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        showToast(data.error || 'Gagal menambah varian', 'error');
-        return;
-      }
-      showToast('Varian baru ditambahkan! Isi stoknya lewat menu Restock.');
-      const produkTerbaru = await fetch(`${API_URL}/api/products`, {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: 'no-store',
-      }).then((r) => r.json());
-      setProducts(produkTerbaru);
-
-      const produkTerbaruItem = produkTerbaru.find((pr) => pr.id === produk.id);
-      if (produkTerbaruItem) {
-        const initial = {};
-        for (const v of produkTerbaruItem.variants) {
-          initial[v.id] = { harga: bulatkanAngka(v.harga), ukuran: v.ukuran || '', warna: v.warna || '' };
-        }
-        setEditVarianValues(initial);
-      }
-      setFormVarianBaru(varianBaruKosong());
-      muatProdukMenipis();
-    } catch (err) {
-      showToast('Tidak bisa terhubung ke server', 'error');
-    } finally {
-      setSavingVarianBaru(false);
-    }
-  };
-
   useEffect(() => {
     if (token) {
       muatProduk();
@@ -280,8 +137,19 @@ function App() {
     return <Login onLoginSuccess={handleLoginSuccess} onLupaPassword={() => setTampilanAuth('lupa-password')} />;
   }
 
-  const menuUntukRole = MENU.filter((m) => m.roles.includes(user?.role));
   const isPakaian = user?.jenis_usaha === 'pakaian';
+  const bolehKelolaProduk = user?.role === 'owner' || (user?.role === 'admin' && user?.permissions?.kelola_produk);
+  const bolehKelolaStok = user?.role === 'owner' || (user?.role === 'admin' && user?.permissions?.kelola_stok);
+
+  const menuUntukRole = MENU.filter((m) => {
+    if (!m.roles.includes(user?.role)) return false;
+    if (user?.role === 'admin' && m.perm) {
+      if (m.perm === 'kelola_produk') return bolehKelolaProduk;
+      if (m.perm === 'kelola_stok') return bolehKelolaStok;
+      return !!user?.permissions?.[m.perm];
+    }
+    return true;
+  });
 
   const productsTampil = products.filter((p) => {
     if (!isPakaian) return true;
@@ -316,17 +184,13 @@ function App() {
         </nav>
 
         <div className="sidebar-footer">
-          <button className="btn btn-secondary btn-block btn-sm" onClick={handleLogout}>
-            Keluar
-          </button>
+          <button className="btn btn-secondary btn-block btn-sm" onClick={handleLogout}>Keluar</button>
         </div>
       </aside>
 
       <div className="main">
         <header className="topbar">
-          <div>
-            <div className="topbar-title">{MENU.find((m) => m.key === halaman)?.label}</div>
-          </div>
+          <div className="topbar-title">{MENU.find((m) => m.key === halaman)?.label}</div>
           <div className="user-chip">
             <span className={`badge badge-${user?.role}`}>{user?.role}</span>
             <span>{user?.nama}</span>
@@ -348,7 +212,7 @@ function App() {
           )}
 
           {halaman === 'produk' && (
-            <div className="card">
+            <div>
               <div className="page-header">
                 <div>
                   <h2 className="page-title">Daftar Produk</h2>
@@ -360,220 +224,81 @@ function App() {
                 <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
                   <select className="input" style={{ width: 'auto' }} value={filterJenis} onChange={(e) => setFilterJenis(e.target.value)}>
                     <option value="">Semua Jenis Produk</option>
-                    {JENIS_PRODUK_PAKAIAN.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
+                    {JENIS_PRODUK_PAKAIAN.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
                   </select>
                   <select className="input" style={{ width: 'auto' }} value={filterUsia} onChange={(e) => setFilterUsia(e.target.value)}>
                     <option value="">Semua Usia</option>
-                    {TARGET_USIA_PAKAIAN.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
+                    {TARGET_USIA_PAKAIAN.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
                   </select>
                   <select className="input" style={{ width: 'auto' }} value={filterSegmen} onChange={(e) => setFilterSegmen(e.target.value)}>
                     <option value="">Semua Segmen</option>
-                    {SEGMEN_PAKAIAN.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
+                    {SEGMEN_PAKAIAN.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
                   </select>
                   {(filterJenis || filterUsia || filterSegmen) && (
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => { setFilterJenis(''); setFilterUsia(''); setFilterSegmen(''); }}
-                    >
+                    <button className="btn btn-secondary btn-sm" onClick={() => { setFilterJenis(''); setFilterUsia(''); setFilterSegmen(''); }}>
                       Reset Filter
                     </button>
                   )}
                 </div>
               )}
 
-              <div className="table-wrap">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Nama</th><th style={{ textAlign: 'center' }}>Harga</th><th>Total Stok</th><th>Cabang</th><th>Detail</th>
-                      {(user?.role === 'owner' || user?.role === 'admin') && <th>Aksi</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {productsTampil.map((p) => {
-                      const punyaVarian = p.variants && p.variants.length > 0;
-                      return (
-                        <Fragment key={p.id}>
-                          <tr>
-                            <td>{p.nama}</td>
-                            <td style={{ fontFamily: 'var(--font-mono)', textAlign: 'center' }}>{tampilanHargaProduk(p)}</td>
-                            <td className="num">{totalStokProduk(p)}</td>
-                            <td>{p.nama_toko}</td>
-                            <td style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
-                              {Object.entries(p.attributes || {}).map(([k, v]) => `${k}: ${v}`).join(', ')}
-                            </td>
-                            {(user?.role === 'owner' || user?.role === 'admin') && (
-                              <td>
-                                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                                  {punyaVarian ? (
-                                    <button className="btn btn-secondary btn-sm" onClick={() => bukaKelolaVarian(p)}>
-                                      {produkDiperluas === p.id ? 'Tutup' : 'Kelola Varian'}
+              <div className="product-grid">
+                {productsTampil.map((p) => {
+                  const punyaVarian = p.variants && p.variants.length > 0;
+                  return (
+                    <div key={p.id} className="product-card">
+                      <div className="product-card-photo">
+                        {p.foto ? <img src={p.foto} alt={p.nama} /> : ICON_KATEGORI[user?.jenis_usaha] || '📦'}
+                      </div>
+                      <div className="product-card-body">
+                        <div className="product-card-name">{p.nama}</div>
+                        <div className="product-card-price">{tampilanHargaProduk(p)}</div>
+                        <div className="product-card-stock">Stok: {totalStokProduk(p)} · {p.nama_toko}</div>
+                        {Object.keys(p.attributes || {}).length > 0 && (
+                          <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>
+                            {Object.entries(p.attributes).map(([k, v]) => v).filter(Boolean).join(' · ')}
+                          </div>
+                        )}
+                        {(bolehKelolaProduk || bolehKelolaStok) && (
+                          <div className="product-card-actions">
+                            {punyaVarian ? (
+                              bolehKelolaProduk && (
+                                <button className="btn btn-secondary btn-sm" onClick={() => setVarianModalProduk(p)}>Kelola Varian</button>
+                              )
+                            ) : (
+                              <>
+                                {bolehKelolaProduk && (
+                                  <>
+                                    <button className="btn btn-secondary btn-sm" onClick={() => { setProdukDiedit(p); pindahHalaman('tambah'); }}>Edit</button>
+                                    <button
+                                      className="btn btn-secondary btn-sm"
+                                      onClick={() => setBarcodeDipilih({ kode: p.sku, judul: p.nama, subJudul: `Rp ${Number(p.harga).toLocaleString('id-ID')}` })}
+                                    >
+                                      🏷️
                                     </button>
-                                  ) : (
-                                    <>
-                                      <button className="btn btn-secondary btn-sm" onClick={() => { setProdukDiedit(p); pindahHalaman('tambah'); }}>Edit</button>
-                                      <button
-                                        className="btn btn-secondary btn-sm"
-                                        onClick={() => setBarcodeDipilih({ kode: p.sku, judul: p.nama, subJudul: `Rp ${Number(p.harga).toLocaleString('id-ID')}` })}
-                                      >
-                                        🏷️
-                                      </button>
-                                      <button
-                                        className="btn btn-secondary btn-sm"
-                                        onClick={() => setKoreksiDipilih({ produkId: p.id, variantId: null, namaTampil: p.nama, stokSaatIni: p.stok })}
-                                      >
-                                        ⚙️ Koreksi
-                                      </button>
-                                    </>
-                                  )}
-                                  <button className="btn btn-danger btn-sm" onClick={() => hapusProduk(p.id)}>Hapus</button>
-                                </div>
-                              </td>
+                                  </>
+                                )}
+                                {bolehKelolaStok && (
+                                  <button
+                                    className="btn btn-secondary btn-sm"
+                                    onClick={() => setKoreksiDipilih({ produkId: p.id, variantId: null, namaTampil: p.nama, stokSaatIni: p.stok })}
+                                  >
+                                    ⚙️
+                                  </button>
+                                )}
+                              </>
                             )}
-                          </tr>
-                          {produkDiperluas === p.id && punyaVarian && (
-                            <tr>
-                              <td colSpan={6} style={{ background: 'var(--color-bg)' }}>
-                                <div style={{ padding: '0.75rem' }}>
-                                  <strong style={{ fontSize: '0.8rem' }}>Varian Produk</strong>
-                                  <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', margin: '4px 0 8px 0' }}>
-                                    Stok di sini hanya bisa ditambah lewat menu <strong>Restock</strong>, atau diperbaiki lewat tombol <strong>⚙️</strong>.
-                                  </p>
-                                  <table className="data-table" style={{ marginTop: '0.5rem' }}>
-                                    <thead>
-                                      <tr><th>Ukuran</th><th>Warna</th><th>Stok</th><th>Harga</th><th style={{ minWidth: '200px' }}></th></tr>
-                                    </thead>
-                                    <tbody>
-                                      {p.variants.map((v) => {
-                                        const sedangSimpan = savingVariantId === v.id;
-                                        return (
-                                          <tr key={v.id}>
-                                            <td>
-                                              <input
-                                                className="input"
-                                                style={{ width: '70px' }}
-                                                value={editVarianValues[v.id]?.ukuran ?? ''}
-                                                onChange={(e) => ubahNilaiVarian(v.id, 'ukuran', e.target.value)}
-                                              />
-                                            </td>
-                                            <td>
-                                              <input
-                                                className="input"
-                                                style={{ width: '90px' }}
-                                                value={editVarianValues[v.id]?.warna ?? ''}
-                                                onChange={(e) => ubahNilaiVarian(v.id, 'warna', e.target.value)}
-                                              />
-                                            </td>
-                                            <td style={{ fontFamily: 'var(--font-mono)' }}>{v.stok}</td>
-                                            <td>
-                                              <div className="input-prefix-group" style={{ width: '130px' }}>
-                                                <span className="input-prefix">Rp</span>
-                                                <input
-                                                  className="input"
-                                                  type="number"
-                                                  placeholder={bulatkanAngka(p.harga)}
-                                                  value={editVarianValues[v.id]?.harga ?? ''}
-                                                  onChange={(e) => ubahNilaiVarian(v.id, 'harga', e.target.value)}
-                                                />
-                                              </div>
-                                            </td>
-                                            <td>
-                                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                <button
-                                                  className="btn btn-secondary btn-sm"
-                                                  onClick={() => setBarcodeDipilih({
-                                                    kode: v.sku,
-                                                    judul: p.nama,
-                                                    subJudul: `${[v.ukuran, v.warna].filter(Boolean).join('/')} · Rp ${Number(v.harga ?? p.harga).toLocaleString('id-ID')}`,
-                                                  })}
-                                                >
-                                                  🏷️
-                                                </button>
-                                                <button
-                                                  className="btn btn-secondary btn-sm"
-                                                  onClick={() => setKoreksiDipilih({
-                                                    produkId: p.id,
-                                                    variantId: v.id,
-                                                    namaTampil: `${p.nama} (${[v.ukuran, v.warna].filter(Boolean).join('/')})`,
-                                                    stokSaatIni: v.stok,
-                                                  })}
-                                                >
-                                                  ⚙️
-                                                </button>
-                                                <button
-                                                  className="btn btn-primary btn-sm"
-                                                  disabled={sedangSimpan}
-                                                  onClick={() => simpanVarian(p, v)}
-                                                >
-                                                  {sedangSimpan ? 'Menyimpan...' : 'Simpan'}
-                                                </button>
-                                              </div>
-                                            </td>
-                                          </tr>
-                                        );
-                                      })}
-
-                                      <tr style={{ background: 'var(--color-surface)' }}>
-                                        <td>
-                                          <input
-                                            className="input"
-                                            placeholder="Ukuran"
-                                            style={{ width: '70px' }}
-                                            value={formVarianBaru.ukuran}
-                                            onChange={(e) => setFormVarianBaru((prev) => ({ ...prev, ukuran: e.target.value }))}
-                                          />
-                                        </td>
-                                        <td>
-                                          <input
-                                            className="input"
-                                            placeholder="Warna"
-                                            style={{ width: '90px' }}
-                                            value={formVarianBaru.warna}
-                                            onChange={(e) => setFormVarianBaru((prev) => ({ ...prev, warna: e.target.value }))}
-                                          />
-                                        </td>
-                                        <td style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>0 (restock setelahnya)</td>
-                                        <td>
-                                          <div className="input-prefix-group" style={{ width: '130px' }}>
-                                            <span className="input-prefix">Rp</span>
-                                            <input
-                                              className="input"
-                                              type="number"
-                                              placeholder={bulatkanAngka(p.harga)}
-                                              value={formVarianBaru.harga}
-                                              onChange={(e) => setFormVarianBaru((prev) => ({ ...prev, harga: e.target.value }))}
-                                            />
-                                          </div>
-                                        </td>
-                                        <td>
-                                          <button
-                                            className="btn btn-primary btn-sm"
-                                            disabled={savingVarianBaru}
-                                            onClick={() => tambahVarianBaru(p)}
-                                          >
-                                            {savingVarianBaru ? 'Menambah...' : '+ Tambah Varian Baru'}
-                                          </button>
-                                        </td>
-                                      </tr>
-                                    </tbody>
-                                  </table>
-                                </div>
-                              </td>
-                            </tr>
-                          )}
-                        </Fragment>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                {productsTampil.length === 0 && <div className="empty-state">Tidak ada produk yang cocok dengan filter ini.</div>}
+                            {bolehKelolaProduk && (
+                              <button className="btn btn-danger btn-sm" onClick={() => hapusProduk(p.id)}>Hapus</button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
+              {productsTampil.length === 0 && <div className="empty-state">Tidak ada produk yang cocok.</div>}
             </div>
           )}
 
@@ -593,20 +318,25 @@ function App() {
           )}
 
           {halaman === 'riwayat' && <RiwayatTransaksi token={token} />}
-
           {halaman === 'laporan' && <Laporan token={token} />}
-
           {halaman === 'supplier' && <KelolaSupplier token={token} />}
-
           {halaman === 'restock' && <Restock token={token} storeIdUser={user?.store_id} />}
-
           {halaman === 'staff' && <KelolaStaff token={token} />}
-
           {halaman === 'cabang' && <KelolaCabang token={token} />}
-
           {halaman === 'pelanggan' && <Pelanggan token={token} />}
         </main>
       </div>
+
+      {varianModalProduk && (
+        <VarianModal
+          token={token}
+          produk={varianModalProduk}
+          onTutup={() => setVarianModalProduk(null)}
+          onBerubah={() => { muatProduk(); muatProdukMenipis(); }}
+          onBukaBarcode={setBarcodeDipilih}
+          onBukaKoreksi={setKoreksiDipilih}
+        />
+      )}
 
       {barcodeDipilih && (
         <BarcodeLabel
