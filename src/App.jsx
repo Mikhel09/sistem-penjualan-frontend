@@ -270,32 +270,31 @@ function App() {
                         )}
                         {(bolehKelolaProduk || bolehKelolaStok) && (
                           <div className="product-card-actions">
-                            {punyaVarian ? (
-                              bolehKelolaProduk && (
-                                <button className="btn btn-secondary btn-sm" onClick={() => setVarianModalProduk(p)}>Kelola Varian</button>
-                              )
-                            ) : (
+                            {bolehKelolaProduk && (
                               <>
-                                {bolehKelolaProduk && (
-                                  <>
-                                    <button className="btn btn-secondary btn-sm" onClick={() => { setProdukDiedit(p); pindahHalaman('tambah'); }}>Edit</button>
-                                    <button
-                                      className="btn btn-secondary btn-sm"
-                                      onClick={() => setBarcodeDipilih({ kode: p.sku, judul: p.nama, subJudul: `Rp ${Number(p.harga).toLocaleString('id-ID')}` })}
-                                    >
-                                      🏷️
-                                    </button>
-                                  </>
+                                <button className="btn btn-secondary btn-sm" onClick={() => { setProdukDiedit(p); pindahHalaman('tambah'); }}>
+                                  Edit{punyaVarian ? ' Produk' : ''}
+                                </button>
+                                {punyaVarian && (
+                                  <button className="btn btn-secondary btn-sm" onClick={() => setVarianModalProduk(p)}>Kelola Varian</button>
                                 )}
-                                {bolehKelolaStok && (
+                                {!punyaVarian && (
                                   <button
                                     className="btn btn-secondary btn-sm"
-                                    onClick={() => setKoreksiDipilih({ produkId: p.id, variantId: null, namaTampil: p.nama, stokSaatIni: p.stok })}
+                                    onClick={() => setBarcodeDipilih({ kode: p.sku, judul: p.nama, subJudul: `Rp ${Number(p.harga).toLocaleString('id-ID')}` })}
                                   >
-                                    ⚙️
+                                    🏷️
                                   </button>
                                 )}
                               </>
+                            )}
+                            {bolehKelolaStok && !punyaVarian && (
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => setKoreksiDipilih({ produkId: p.id, variantId: null, namaTampil: p.nama, stokSaatIni: p.stok })}
+                              >
+                                ⚙️
+                              </button>
                             )}
                             {bolehKelolaProduk && (
                               <button className="btn btn-danger btn-sm" onClick={() => hapusProduk(p.id)}>Hapus</button>
