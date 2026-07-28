@@ -20,7 +20,7 @@ import { API_URL } from './api';
 import { JENIS_PRODUK_PAKAIAN, TARGET_USIA_PAKAIAN, SEGMEN_PAKAIAN } from './kategoriPakaian';
 import PhotoGalleryModal from './PhotoGalleryModal';
 
-const [galeriDipilih, setGaleriDipilih] = useState(null); // { fotos, judul }
+
 
 const MENU = [
   { key: 'produk', label: 'Daftar Produk', icon: '📦', roles: ['owner', 'admin', 'kasir'] },
@@ -64,10 +64,12 @@ function App() {
   const [varianModalProduk, setVarianModalProduk] = useState(null);
   const [barcodeDipilih, setBarcodeDipilih] = useState(null);
   const [koreksiDipilih, setKoreksiDipilih] = useState(null);
+  const [galeriDipilih, setGaleriDipilih] = useState(null); // { fotos, judul }
 
   const [filterJenis, setFilterJenis] = useState('');
   const [filterUsia, setFilterUsia] = useState('');
   const [filterSegmen, setFilterSegmen] = useState('');
+  
 
   const urlParams = new URLSearchParams(window.location.search);
   const resetToken = urlParams.get('token');
