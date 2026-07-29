@@ -2,6 +2,12 @@ import { useState, useEffect } from 'react';
 import { API_URL } from './api';
 import { showToast } from './toast';
 
+const DAFTAR_IZIN = [
+  { key: 'kelola_produk', label: 'Kelola Produk', desc: 'Tambah, edit, hapus produk & varian' },
+  { key: 'kelola_stok', label: 'Kelola Stok', desc: 'Restock, koreksi stok, kelola supplier' },
+  { key: 'lihat_laporan', label: 'Lihat Laporan', desc: 'Akses laporan penjualan & grafik' },
+];
+
 function KelolaStaff({ token }) {
   const [staffList, setStaffList] = useState([]);
   const [cabangList, setCabangList] = useState([]);
@@ -10,19 +16,27 @@ function KelolaStaff({ token }) {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('kasir');
   const [storeId, setStoreId] = useState('');
-  const [pindahCabangValues, setPindahCabangValues] = useState({}); // { [staffId]: storeIdTujuan }
+  const [pindahCabangValues, setPindahCabangValues] = useState({});
   const [savingPindahId, setSavingPindahId] = useState(null);
+  const [izinDibuka, setIzinDibuka] = useState(null); // id staff yang panel izinnya sedang terbuka
+  const [izinValues, setIzinValues] = useState({}); // { [staffId]: { kelola_produk: bool, ... } }
+  const [savingIzinId, setSavingIzinId] = useState(null);
 
   const muatStaff = () => {
     fetch(`${API_URL}/api/users`, { headers: { Authorization: `Bearer ${token}` } })
       .then((res) => res.json())
       .then((data) => {
         setStaffList(data);
-        const initial = {};
+        const initialCabang = {};
+        const initialIzin = {};
         for (const s of data) {
-          if (s.role !== 'owner') initial[s.id] = String(s.store_id || '');
+          if (s.role !== 'owner') {
+            initialCabang[s.id] = String(s.store_id || '');
+            initialIzin[s.id] = s.permissions || {};
+          }
         }
-        setPindahCabangValues(initial);
+        setPindahCabangValues(initialCabang);
+        setIzinValues(initialIzin);
       });
   };
 
@@ -92,6 +106,35 @@ function KelolaStaff({ token }) {
     }
   };
 
+  const toggleIzin = (staffId, key) => {
+    setIzinValues((prev) => ({
+      ...prev,
+      [staffId]: { ...prev[staffId], [key]: !prev[staffId]?.[key] },
+    }));
+  };
+
+  const simpanIzin = async (staff) => {
+    setSavingIzinId(staff.id);
+    try {
+      const res = await fetch(`${API_URL}/api/users/${staff.id}/permissions`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ permissions: izinValues[staff.id] || {} }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Gagal menyimpan izin', 'error');
+        return;
+      }
+      showToast(`Izin akses ${staff.nama} berhasil diperbarui!`);
+      muatStaff();
+    } catch (err) {
+      showToast('Tidak bisa terhubung ke server', 'error');
+    } finally {
+      setSavingIzinId(null);
+    }
+  };
+
   return (
     <div>
       <div className="card" style={{ maxWidth: '420px' }}>
@@ -129,46 +172,90 @@ function KelolaStaff({ token }) {
           </div>
           <button type="submit" className="btn btn-primary">Tambah Staff</button>
         </form>
+        <p style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '0.75rem' }}>
+          Setelah staff dibuat, atur izin akses spesifiknya (khusus role Admin) lewat tabel di bawah.
+        </p>
       </div>
 
       <div className="card">
         <h2 className="card-title">Daftar Staff</h2>
         <div className="table-wrap">
           <table className="data-table">
-            <thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Cabang Saat Ini</th><th style={{ minWidth: '260px' }}>Pindah Cabang</th></tr></thead>
+            <thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Cabang Saat Ini</th><th style={{ minWidth: '260px' }}>Pindah Cabang</th><th></th></tr></thead>
             <tbody>
               {staffList.map((s) => (
-                <tr key={s.id}>
-                  <td>{s.nama}</td>
-                  <td>{s.email}</td>
-                  <td><span className={`badge badge-${s.role}`}>{s.role}</span></td>
-                  <td>{s.nama_toko || '-'}</td>
-                  <td>
-                    {s.role === 'owner' ? (
-                      <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>Owner akses semua cabang</span>
-                    ) : (
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <select
-                          className="input"
-                          style={{ width: 'auto' }}
-                          value={pindahCabangValues[s.id] || ''}
-                          onChange={(e) => setPindahCabangValues((prev) => ({ ...prev, [s.id]: e.target.value }))}
-                        >
-                          {cabangList.map((c) => (
-                            <option key={c.id} value={c.id}>{c.nama_toko}</option>
-                          ))}
-                        </select>
+                <>
+                  <tr key={s.id}>
+                    <td>{s.nama}</td>
+                    <td>{s.email}</td>
+                    <td><span className={`badge badge-${s.role}`}>{s.role}</span></td>
+                    <td>{s.nama_toko || '-'}</td>
+                    <td>
+                      {s.role === 'owner' ? (
+                        <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>Owner akses semua cabang</span>
+                      ) : (
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <select
+                            className="input"
+                            style={{ width: 'auto' }}
+                            value={pindahCabangValues[s.id] || ''}
+                            onChange={(e) => setPindahCabangValues((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                          >
+                            {cabangList.map((c) => (
+                              <option key={c.id} value={c.id}>{c.nama_toko}</option>
+                            ))}
+                          </select>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            disabled={savingPindahId === s.id}
+                            onClick={() => pindahkanCabang(s)}
+                          >
+                            {savingPindahId === s.id ? 'Memindahkan...' : 'Pindahkan'}
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      {s.role === 'admin' && (
                         <button
                           className="btn btn-secondary btn-sm"
-                          disabled={savingPindahId === s.id}
-                          onClick={() => pindahkanCabang(s)}
+                          onClick={() => setIzinDibuka(izinDibuka === s.id ? null : s.id)}
                         >
-                          {savingPindahId === s.id ? 'Memindahkan...' : 'Pindahkan'}
+                          {izinDibuka === s.id ? 'Tutup Izin' : '🔐 Atur Izin'}
                         </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
+                      )}
+                    </td>
+                  </tr>
+                  {izinDibuka === s.id && (
+                    <tr>
+                      <td colSpan={6} style={{ background: 'var(--color-bg)' }}>
+                        <div style={{ padding: '0.85rem' }}>
+                          <strong style={{ fontSize: '0.82rem' }}>Izin Akses untuk {s.nama}</strong>
+                          <div className="permission-row" style={{ marginTop: '0.6rem', marginBottom: '0.75rem' }}>
+                            {DAFTAR_IZIN.map((izin) => (
+                              <label key={izin.key} title={izin.desc}>
+                                <input
+                                  type="checkbox"
+                                  checked={!!izinValues[s.id]?.[izin.key]}
+                                  onChange={() => toggleIzin(s.id, izin.key)}
+                                />
+                                {izin.label}
+                                <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>({izin.desc})</span>
+                              </label>
+                            ))}
+                          </div>
+                          <button
+                            className="btn btn-primary btn-sm"
+                            disabled={savingIzinId === s.id}
+                            onClick={() => simpanIzin(s)}
+                          >
+                            {savingIzinId === s.id ? 'Menyimpan...' : 'Simpan Izin'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
               ))}
             </tbody>
           </table>

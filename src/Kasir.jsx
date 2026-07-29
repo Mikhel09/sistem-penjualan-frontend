@@ -10,6 +10,8 @@ const METODE_BAYAR = [
   { key: 'qris', label: 'QRIS', icon: '📱' },
 ];
 
+const ICON_KATEGORI = { pakaian: '👕', makanan_minuman: '🍔', supermarket: '🛒' };
+
 function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
   const [cabangList, setCabangList] = useState([]);
   const [storeIdDipilih, setStoreIdDipilih] = useState('');
@@ -40,22 +42,20 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
     }
   }, []);
 
- const muatProdukKasir = () => {
-  if (!storeIdAktif) return;
-  const url = storeIdUser ? `${API_URL}/api/products` : `${API_URL}/api/products?store_id=${storeIdAktif}`;
-  fetch(url, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
-    .then((res) => res.json())
-    .then(setProducts);
-};
+  const muatProdukKasir = () => {
+    if (!storeIdAktif) return;
+    const url = storeIdUser ? `${API_URL}/api/products` : `${API_URL}/api/products?store_id=${storeIdAktif}`;
+    fetch(url, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
+      .then((res) => res.json())
+      .then(setProducts);
+  };
 
   useEffect(() => {
     muatProdukKasir();
   }, [storeIdAktif]);
 
-  // Kamera scan (barcode/QR) — aktif hanya waktu tombol "Pindai" diklik
   useEffect(() => {
     if (!scannerAktif) return;
-
     const scanner = new Html5QrcodeScanner('scanner-box', { fps: 10, qrbox: 200 }, false);
     scanner.render(
       (decodedText) => {
@@ -64,9 +64,8 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
         setScannerAktif(false);
         cariProdukByKode(decodedText);
       },
-      () => {} // abaikan kalau belum ketemu di frame ini, itu wajar
+      () => {}
     );
-
     return () => {
       scanner.clear().catch(() => {});
     };
@@ -107,10 +106,11 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
         ? `${produk.nama} (${[varian.ukuran, varian.warna].filter(Boolean).join('/')})`
         : produk.nama;
       const hargaDipakai = varian ? Number(varian.harga ?? produk.harga) : Number(produk.harga);
+      const fotoDipakai = varian?.fotos?.[0] || produk.fotos?.[0] || null;
 
       return [
         ...prev,
-        { product_id: produk.id, variant_id: varian ? varian.id : null, nama: namaTampil, harga: hargaDipakai, qty: 1 },
+        { product_id: produk.id, variant_id: varian ? varian.id : null, nama: namaTampil, harga: hargaDipakai, qty: 1, foto: fotoDipakai },
       ];
     });
   };
@@ -285,11 +285,7 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
             onChange={(e) => setKodeCari(e.target.value)}
           />
           <button className="btn btn-secondary" type="submit">Cari</button>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => setScannerAktif((s) => !s)}
-          >
+          <button type="button" className="btn btn-secondary" onClick={() => setScannerAktif((s) => !s)}>
             {scannerAktif ? 'Tutup Kamera' : '📷 Pindai'}
           </button>
         </form>
@@ -300,56 +296,69 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
             <select className="input" style={{ width: 'auto' }} value={filterJenis} onChange={(e) => setFilterJenis(e.target.value)}>
               <option value="">Semua Jenis</option>
-              {JENIS_PRODUK_PAKAIAN.map((opt) => (
-                <option key={opt} value={opt}>{opt}</option>
-              ))}
+              {JENIS_PRODUK_PAKAIAN.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
             </select>
             <select className="input" style={{ width: 'auto' }} value={filterUsia} onChange={(e) => setFilterUsia(e.target.value)}>
               <option value="">Semua Usia</option>
-              {TARGET_USIA_PAKAIAN.map((opt) => (
-                <option key={opt} value={opt}>{opt}</option>
-              ))}
+              {TARGET_USIA_PAKAIAN.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
             </select>
           </div>
         )}
 
-        {productsTampil.map((p) => {
-          const punyaVarian = p.variants && p.variants.length > 0;
+        <div className="product-grid">
+          {productsTampil.map((p) => {
+            const punyaVarian = p.variants && p.variants.length > 0;
+            const fotoUtama = p.fotos?.[0];
 
-          if (!punyaVarian) {
+            if (!punyaVarian) {
+              const habis = p.stok <= 0;
+              return (
+                <div
+                  key={p.id}
+                  className={`product-card pos-product-card ${habis ? 'disabled' : ''}`}
+                  onClick={() => !habis && tambahKeKeranjang(p, null)}
+                >
+                  <div className="product-card-photo">
+                    {fotoUtama ? <img src={fotoUtama} alt={p.nama} /> : ICON_KATEGORI[jenisUsaha] || '📦'}
+                  </div>
+                  <div className="product-card-body">
+                    <div className="product-card-name">{p.nama}</div>
+                    <div className="product-card-price">Rp {Number(p.harga).toLocaleString('id-ID')}</div>
+                    <div className="product-card-stock">{habis ? 'Stok habis' : `Stok: ${p.stok}`}</div>
+                  </div>
+                </div>
+              );
+            }
+
             return (
-              <button key={p.id} className="product-btn" onClick={() => tambahKeKeranjang(p, null)} disabled={p.stok <= 0}>
-                <span>{p.nama} <span style={{ color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>(stok: {p.stok})</span></span>
-                <span className="price">Rp {Number(p.harga).toLocaleString('id-ID')}</span>
-              </button>
-            );
-          }
-
-          return (
-            <div key={p.id} style={{ marginBottom: '10px' }}>
-              <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>{p.nama}</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {p.variants.map((v) => {
-                  const habis = v.stok <= 0;
-                  const hargaVarian = Number(v.harga ?? p.harga);
-                  const label = [v.ukuran, v.warna].filter(Boolean).join(' / ') || 'Default';
-                  return (
-                    <button
-                      key={v.id}
-                      className="btn btn-secondary btn-sm"
-                      style={{ opacity: habis ? 0.4 : 1 }}
-                      disabled={habis}
-                      onClick={() => tambahKeKeranjang(p, v)}
-                      title={habis ? 'Stok habis' : ''}
-                    >
-                      {label} · stok {v.stok} · Rp {hargaVarian.toLocaleString('id-ID')}
-                    </button>
-                  );
-                })}
+              <div key={p.id} className="product-card">
+                <div className="product-card-photo">
+                  {fotoUtama ? <img src={fotoUtama} alt={p.nama} /> : ICON_KATEGORI[jenisUsaha] || '📦'}
+                </div>
+                <div className="product-card-body">
+                  <div className="product-card-name">{p.nama}</div>
+                </div>
+                <div className="variant-chip-row">
+                  {p.variants.map((v) => {
+                    const habis = v.stok <= 0;
+                    const hargaVarian = Number(v.harga ?? p.harga);
+                    const label = [v.ukuran, v.warna].filter(Boolean).join('/') || 'Default';
+                    return (
+                      <button
+                        key={v.id}
+                        className={`variant-chip ${habis ? 'habis' : ''}`}
+                        disabled={habis}
+                        onClick={() => tambahKeKeranjang(p, v)}
+                      >
+                        {label} · Rp {hargaVarian.toLocaleString('id-ID')}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
         {productsTampil.length === 0 && <div className="empty-state">Belum ada produk di cabang ini.</div>}
       </div>
 
@@ -405,12 +414,22 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
         </div>
 
         {cart.length === 0 ? (
-          <div className="empty-state">Keranjang kosong</div>
+          <div className="empty-state">Keranjang kosong. Klik produk di samping untuk mulai.</div>
         ) : (
           <>
             {cart.map((item) => (
-              <div key={kunciCart(item.product_id, item.variant_id)} className="cart-line">
-                <span>{item.nama} x{item.qty}</span>
+              <div key={kunciCart(item.product_id, item.variant_id)} className="cart-line" style={{ alignItems: 'center' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span
+                    style={{
+                      width: 32, height: 32, borderRadius: 6, overflow: 'hidden', flexShrink: 0,
+                      background: 'var(--color-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem',
+                    }}
+                  >
+                    {item.foto ? <img src={item.foto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : ICON_KATEGORI[jenisUsaha] || '📦'}
+                  </span>
+                  {item.nama} x{item.qty}
+                </span>
                 <span>Rp {(item.harga * item.qty).toLocaleString('id-ID')}</span>
               </div>
             ))}
@@ -437,7 +456,7 @@ function Kasir({ token, jenisUsaha, namaBisnis, storeIdUser }) {
               Rp {totalKeranjang.toLocaleString('id-ID')}
             </p>
             <p style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
-              ⚠️ QR simulasi lokal, bukan QRIS resmi. Untuk QRIS sungguhan perlu integrasi penyedia resmi (Midtrans/Xendit/dll).
+              ⚠️ QR simulasi lokal, bukan QRIS resmi.
             </p>
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
               <button className="btn btn-primary btn-block" onClick={() => { setShowQRPayment(false); prosesBayar(); }}>
