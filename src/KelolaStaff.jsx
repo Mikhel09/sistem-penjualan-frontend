@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { API_URL } from './api';
 import { showToast } from './toast';
 
@@ -6,9 +6,10 @@ const DAFTAR_IZIN = [
   { key: 'kelola_produk', label: 'Kelola Produk', desc: 'Tambah, edit, hapus produk & varian' },
   { key: 'kelola_stok', label: 'Kelola Stok', desc: 'Restock, koreksi stok, kelola supplier' },
   { key: 'lihat_laporan', label: 'Lihat Laporan', desc: 'Akses laporan penjualan & grafik' },
+  { key: 'kelola_staff', label: 'Kelola Staff (khusus Admin)', desc: 'Tambah & atur izin akun kasir' },
 ];
 
-function KelolaStaff({ token }) {
+function KelolaStaff({ token, viewerRole }) {
   const [staffList, setStaffList] = useState([]);
   const [cabangList, setCabangList] = useState([]);
   const [nama, setNama] = useState('');
@@ -18,9 +19,11 @@ function KelolaStaff({ token }) {
   const [storeId, setStoreId] = useState('');
   const [pindahCabangValues, setPindahCabangValues] = useState({});
   const [savingPindahId, setSavingPindahId] = useState(null);
-  const [izinDibuka, setIzinDibuka] = useState(null); // id staff yang panel izinnya sedang terbuka
-  const [izinValues, setIzinValues] = useState({}); // { [staffId]: { kelola_produk: bool, ... } }
+  const [izinDibuka, setIzinDibuka] = useState(null);
+  const [izinValues, setIzinValues] = useState({});
   const [savingIzinId, setSavingIzinId] = useState(null);
+
+  const isOwner = viewerRole === 'owner';
 
   const muatStaff = () => {
     fetch(`${API_URL}/api/users`, { headers: { Authorization: `Bearer ${token}` } })
@@ -61,7 +64,7 @@ function KelolaStaff({ token }) {
       const res = await fetch(`${API_URL}/api/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ nama, email, password, role, store_id: Number(storeId) }),
+        body: JSON.stringify({ nama, email, password, role: isOwner ? role : 'kasir', store_id: Number(storeId) }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -139,6 +142,11 @@ function KelolaStaff({ token }) {
     <div>
       <div className="card" style={{ maxWidth: '420px' }}>
         <h2 className="card-title">Tambah Staff Baru</h2>
+        {!isOwner && (
+          <p style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', marginTop: '-8px' }}>
+            Sebagai Admin, staff yang kamu tambahkan otomatis berperan sebagai Kasir.
+          </p>
+        )}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label className="form-label">Nama</label>
@@ -153,13 +161,15 @@ function KelolaStaff({ token }) {
             <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
           </div>
           <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">Role</label>
-              <select className="input" value={role} onChange={(e) => setRole(e.target.value)}>
-                <option value="kasir">Kasir</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
+            {isOwner && (
+              <div className="form-group" style={{ flex: 1 }}>
+                <label className="form-label">Role</label>
+                <select className="input" value={role} onChange={(e) => setRole(e.target.value)}>
+                  <option value="kasir">Kasir</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+            )}
             <div className="form-group" style={{ flex: 1 }}>
               <label className="form-label">Cabang</label>
               <select className="input" value={storeId} onChange={(e) => setStoreId(e.target.value)} required>
@@ -172,20 +182,17 @@ function KelolaStaff({ token }) {
           </div>
           <button type="submit" className="btn btn-primary">Tambah Staff</button>
         </form>
-        <p style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '0.75rem' }}>
-          Setelah staff dibuat, atur izin akses spesifiknya (khusus role Admin) lewat tabel di bawah.
-        </p>
       </div>
 
       <div className="card">
-        <h2 className="card-title">Daftar Staff</h2>
+        <h2 className="card-title">Daftar Staff {!isOwner && '(Kasir)'}</h2>
         <div className="table-wrap">
           <table className="data-table">
             <thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Cabang Saat Ini</th><th style={{ minWidth: '260px' }}>Pindah Cabang</th><th></th></tr></thead>
             <tbody>
               {staffList.map((s) => (
-                <>
-                  <tr key={s.id}>
+                <Fragment key={s.id}>
+                  <tr>
                     <td>{s.nama}</td>
                     <td>{s.email}</td>
                     <td><span className={`badge badge-${s.role}`}>{s.role}</span></td>
@@ -216,7 +223,7 @@ function KelolaStaff({ token }) {
                       )}
                     </td>
                     <td>
-                      {s.role === 'admin' && (
+                      {(s.role === 'admin' || s.role === 'kasir') && (
                         <button
                           className="btn btn-secondary btn-sm"
                           onClick={() => setIzinDibuka(izinDibuka === s.id ? null : s.id)}
@@ -232,7 +239,7 @@ function KelolaStaff({ token }) {
                         <div style={{ padding: '0.85rem' }}>
                           <strong style={{ fontSize: '0.82rem' }}>Izin Akses untuk {s.nama}</strong>
                           <div className="permission-row" style={{ marginTop: '0.6rem', marginBottom: '0.75rem' }}>
-                            {DAFTAR_IZIN.map((izin) => (
+                            {DAFTAR_IZIN.filter((izin) => izin.key !== 'kelola_staff' || s.role === 'admin').map((izin) => (
                               <label key={izin.key} title={izin.desc}>
                                 <input
                                   type="checkbox"
@@ -255,7 +262,7 @@ function KelolaStaff({ token }) {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>

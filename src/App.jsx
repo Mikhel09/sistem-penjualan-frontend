@@ -31,7 +31,7 @@ const MENU = [
   { key: 'laporan', label: 'Laporan', icon: '📊', roles: ['owner', 'admin'], perm: 'lihat_laporan' },
   { key: 'supplier', label: 'Supplier', icon: '🚚', roles: ['owner', 'admin'], perm: 'kelola_stok' },
   { key: 'restock', label: 'Restock', icon: '📥', roles: ['owner', 'admin'], perm: 'kelola_stok' },
-  { key: 'staff', label: 'Kelola Staff', icon: '👔', roles: ['owner'] },
+  { key: 'staff', label: 'Kelola Staff', icon: '👔', roles: ['owner', 'admin'], perm: 'kelola_staff' },
   { key: 'cabang', label: 'Kelola Cabang', icon: '🏬', roles: ['owner'] },
 ];
 
@@ -143,18 +143,18 @@ function App() {
   }
 
   const isPakaian = user?.jenis_usaha === 'pakaian';
-  const bolehKelolaProduk = user?.role === 'owner' || (user?.role === 'admin' && user?.permissions?.kelola_produk);
-  const bolehKelolaStok = user?.role === 'owner' || (user?.role === 'admin' && user?.permissions?.kelola_stok);
+  const bolehKelolaProduk = user?.role === 'owner' || ((user?.role === 'admin' || user?.role === 'kasir') && user?.permissions?.kelola_produk);
+  const bolehKelolaStok = user?.role === 'owner' || ((user?.role === 'admin' || user?.role === 'kasir') && user?.permissions?.kelola_stok);
 
   const menuUntukRole = MENU.filter((m) => {
-    if (!m.roles.includes(user?.role)) return false;
-    if (user?.role === 'admin' && m.perm) {
-      if (m.perm === 'kelola_produk') return bolehKelolaProduk;
-      if (m.perm === 'kelola_stok') return bolehKelolaStok;
-      return !!user?.permissions?.[m.perm];
-    }
-    return true;
-  });
+  if (!m.roles.includes(user?.role)) return false;
+  if ((user?.role === 'admin' || user?.role === 'kasir') && m.perm) {
+    if (m.perm === 'kelola_produk') return bolehKelolaProduk;
+    if (m.perm === 'kelola_stok') return bolehKelolaStok;
+    return !!user?.permissions?.[m.perm];
+  }
+  return true;
+});
 
   const productsTampil = products.filter((p) => {
     if (!isPakaian) return true;
@@ -329,7 +329,7 @@ function App() {
           {halaman === 'laporan' && <Laporan token={token} />}
           {halaman === 'supplier' && <KelolaSupplier token={token} />}
           {halaman === 'restock' && <Restock token={token} storeIdUser={user?.store_id} />}
-          {halaman === 'staff' && <KelolaStaff token={token} />}
+          {halaman === 'staff' && <KelolaStaff token={token} viewerRole={user?.role} />}
           {halaman === 'cabang' && <KelolaCabang token={token} />}
           {halaman === 'pelanggan' && <Pelanggan token={token} />}
         </main>
