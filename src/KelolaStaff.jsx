@@ -26,22 +26,28 @@ function KelolaStaff({ token, viewerRole }) {
   const isOwner = viewerRole === 'owner';
 
   const muatStaff = () => {
-    fetch(`${API_URL}/api/users`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((res) => res.json())
-      .then((data) => {
-        setStaffList(data);
-        const initialCabang = {};
-        const initialIzin = {};
-        for (const s of data) {
-          if (s.role !== 'owner') {
-            initialCabang[s.id] = String(s.store_id || '');
-            initialIzin[s.id] = s.permissions || {};
-          }
+  fetch(`${API_URL}/api/users`, { headers: { Authorization: `Bearer ${token}` } })
+    .then(async (res) => {
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Anda tidak memiliki akses ke halaman ini', 'error');
+        setStaffList([]);
+        return;
+      }
+      setStaffList(data);
+      const initialCabang = {};
+      const initialIzin = {};
+      for (const s of data) {
+        if (s.role !== 'owner') {
+          initialCabang[s.id] = String(s.store_id || '');
+          initialIzin[s.id] = s.permissions || {};
         }
-        setPindahCabangValues(initialCabang);
-        setIzinValues(initialIzin);
-      });
-  };
+      }
+      setPindahCabangValues(initialCabang);
+      setIzinValues(initialIzin);
+    })
+    .catch(() => showToast('Tidak bisa terhubung ke server', 'error'));
+};
 
   const muatCabang = () => {
     fetch(`${API_URL}/api/stores`, { headers: { Authorization: `Bearer ${token}` } })
